@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "l94PmKe9Smo=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Application\\Equalizer.Application.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Sim\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\9.0.10\\microsoft.extensions.dependencyinjection.9.0.10.nupkg.sha512",
+    "C:\\Users\\Sim\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.10\\microsoft.extensions.dependencyinjection.abstractions.9.0.10.nupkg.sha512"
+  ],
+  "logs": []
+}
