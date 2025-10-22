@@ -1,0 +1,88 @@
+# .NET / Visual Studio
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+*.user
+*.lock.json
+*.rsuser
+*.suo
+*.userosscache
+*.userprefs
+*.cache
+*.ide/
+*.ncrunch*
+*.localhistory/
+*.resharper*/
+_ReSharper.Caches/
+
+# Rider
+.idea/
+*.sln.iml
+
+# VSCode
+.vscode/
+.history/
+
+# NuGet
+*.nupkg
+.nuget/packages/
+packages/
+*.snupkg
+
+# MSBuild
+*.obj
+*.pdb
+*.cachefile
+*.mdb
+*.ipch
+*.dbmdl
+*.scc
+
+# WPF
+*.g.i.cs
+*.baml
+*.g.cs
+*.xaml.cs~
+
+# Test
+TestResults/
+*.coverage*
+*.trx
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tools
+/.vs/
+/.idea/
+/.gradle/
+/tools/
+
+# Artifacts
+artifacts/
+publish/
+/dist/
+/coverage/
+
+# Temporary
+*.tmp
+*.temp
+~$*
+
+# Build output (explicit)
+Equalizer.Domain/bin/
+Equalizer.Domain/obj/
+Equalizer.Application/bin/
+Equalizer.Application/obj/
+Equalizer.Infrastructure/bin/
+Equalizer.Infrastructure/obj/
+Equalizer.Presentation/bin/
+Equalizer.Presentation/obj/
+Equalizer.Tests/bin/
+Equalizer.Tests/obj/
