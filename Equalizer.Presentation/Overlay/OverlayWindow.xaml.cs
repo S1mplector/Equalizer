@@ -147,6 +147,15 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private static System.Windows.Media.Color LerpColor(System.Windows.Media.Color a, System.Windows.Media.Color b, float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        byte r = (byte)(a.R + (b.R - a.R) * t);
+        byte g = (byte)(a.G + (b.G - a.G) * t);
+        byte bl = (byte)(a.B + (b.B - a.B) * t);
+        return System.Windows.Media.Color.FromRgb(r, g, bl);
+    }
+
     private static (int r, int g, int b) HsvToRgb(double h, double s, double v)
     {
         h = (h % 360 + 360) % 360;
