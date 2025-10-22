@@ -8,4 +8,10 @@ public interface IOverlayManager
     Task HideAsync();
     Task ToggleAsync();
     bool IsVisible { get; }
+    bool ClickThrough { get; }
+    bool AlwaysOnTop { get; }
+    Task SetClickThroughAsync(bool value);
+    Task ToggleClickThroughAsync();
+    Task SetAlwaysOnTopAsync(bool value);
+    Task ToggleAlwaysOnTopAsync();
 }

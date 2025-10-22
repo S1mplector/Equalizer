@@ -63,3 +63,5 @@ C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\bin\Debug\n
 C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\bin\Debug\net8.0-windows\NAudio.WinForms.dll
 C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\bin\Debug\net8.0-windows\NAudio.WinMM.dll
 C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\obj\Debug\net8.0-windows\App.baml
+C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\obj\Debug\net8.0-windows\Overlay\OverlayWindow.baml
+C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\obj\Debug\net8.0-windows\Overlay\OverlayWindow.g.cs

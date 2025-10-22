@@ -33,11 +33,26 @@ public sealed class TrayIconHostedService : IHostedService
             var showItem = new Forms.ToolStripMenuItem("Show Overlay", null, async (_, __) => await _overlay.ShowAsync());
             var hideItem = new Forms.ToolStripMenuItem("Hide Overlay", null, async (_, __) => await _overlay.HideAsync());
             var toggleItem = new Forms.ToolStripMenuItem("Toggle Overlay", null, async (_, __) => await _overlay.ToggleAsync());
+            var clickThroughItem = new Forms.ToolStripMenuItem("Click-through") { CheckOnClick = true, Checked = _overlay.ClickThrough };
+            clickThroughItem.Click += async (_, __) =>
+            {
+                await _overlay.ToggleClickThroughAsync();
+                clickThroughItem.Checked = _overlay.ClickThrough;
+            };
+            var alwaysOnTopItem = new Forms.ToolStripMenuItem("Always on top") { CheckOnClick = true, Checked = _overlay.AlwaysOnTop };
+            alwaysOnTopItem.Click += async (_, __) =>
+            {
+                await _overlay.ToggleAlwaysOnTopAsync();
+                alwaysOnTopItem.Checked = _overlay.AlwaysOnTop;
+            };
             var exitItem = new Forms.ToolStripMenuItem("Exit", null, (_, __) => WpfApp.Current.Shutdown());
 
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(hideItem);
             contextMenu.Items.Add(toggleItem);
+            contextMenu.Items.Add(new Forms.ToolStripSeparator());
+            contextMenu.Items.Add(clickThroughItem);
+            contextMenu.Items.Add(alwaysOnTopItem);
             contextMenu.Items.Add(new Forms.ToolStripSeparator());
             contextMenu.Items.Add(exitItem);
             _icon.ContextMenuStrip = contextMenu;

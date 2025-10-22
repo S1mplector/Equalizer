@@ -1,49 +1,82 @@
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Interop;
+using Equalizer.Presentation.Interop;
 
 namespace Equalizer.Presentation.Overlay;
 
 public sealed class OverlayManager : IOverlayManager
 {
     private readonly MainWindow _window;
+    private bool _clickThrough;
+    private bool _alwaysOnTop;
 
     public OverlayManager(MainWindow window)
     {
         _window = window;
         ConfigureOverlayWindow(_window);
+        _window.SourceInitialized += (_, __) => WindowStyles.ApplyOverlayExtendedStyles(_window, _clickThrough);
     }
 
-    public bool IsVisible => _window.IsVisible;
+    public bool IsVisible => _window.Dispatcher.CheckAccess() ? _window.IsVisible : _window.Dispatcher.Invoke(() => _window.IsVisible);
+    public bool ClickThrough => _clickThrough;
+    public bool AlwaysOnTop => _alwaysOnTop;
 
     public Task ShowAsync()
     {
-        if (!_window.IsVisible)
+        return _window.Dispatcher.InvokeAsync(() =>
         {
-            _window.Show();
-            _window.Activate();
-        }
-        else
-        {
-            _window.Topmost = true; // keep on top
-            _window.Topmost = false;
-            _window.Topmost = true;
-        }
-        return Task.CompletedTask;
+            if (!_window.IsVisible)
+            {
+                _window.Show();
+                _window.Activate();
+            }
+            else
+            {
+                _window.Topmost = true; // keep on top
+                _window.Topmost = false;
+                _window.Topmost = true;
+            }
+        }).Task;
     }
 
     public Task HideAsync()
     {
-        if (_window.IsVisible)
+        return _window.Dispatcher.InvokeAsync(() =>
         {
-            _window.Hide();
-        }
-        return Task.CompletedTask;
+            if (_window.IsVisible)
+            {
+                _window.Hide();
+            }
+        }).Task;
     }
 
     public Task ToggleAsync()
     {
-        return _window.IsVisible ? HideAsync() : ShowAsync();
+        return IsVisible ? HideAsync() : ShowAsync();
     }
+
+    public Task SetClickThroughAsync(bool value)
+    {
+        _clickThrough = value;
+        return _window.Dispatcher.InvokeAsync(() =>
+        {
+            WindowStyles.ApplyOverlayExtendedStyles(_window, _clickThrough);
+        }).Task;
+    }
+
+    public Task ToggleClickThroughAsync() => SetClickThroughAsync(!_clickThrough);
+
+    public Task SetAlwaysOnTopAsync(bool value)
+    {
+        _alwaysOnTop = value;
+        return _window.Dispatcher.InvokeAsync(() =>
+        {
+            _window.Topmost = _alwaysOnTop;
+        }).Task;
+    }
+
+    public Task ToggleAlwaysOnTopAsync() => SetAlwaysOnTopAsync(!_alwaysOnTop);
 
     private static void ConfigureOverlayWindow(Window window)
     {
@@ -52,7 +85,7 @@ public sealed class OverlayManager : IOverlayManager
         window.ShowInTaskbar = false;
         window.AllowsTransparency = true;
         window.Background = System.Windows.Media.Brushes.Transparent;
-        window.Topmost = true;
+        window.Topmost = false;
         window.WindowState = WindowState.Maximized;
     }
 }
