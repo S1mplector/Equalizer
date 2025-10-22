@@ -69,7 +69,15 @@ public sealed class JsonSettingsRepository : ISettingsPort
         public byte ColorG { get; set; } = 255;
         public byte ColorB { get; set; } = 128;
 
-        public EqualizerSettings ToDomain() => new EqualizerSettings(BarsCount, Responsiveness, Smoothing, new ColorRgb(ColorR, ColorG, ColorB));
+        public int TargetFps { get; set; } = 60;
+        public bool ColorCycleEnabled { get; set; } = false;
+        public double ColorCycleSpeedHz { get; set; } = 0.2;
+        public double BarCornerRadius { get; set; } = 1.0;
+
+        public EqualizerSettings ToDomain() => new EqualizerSettings(
+            BarsCount, Responsiveness, Smoothing, new ColorRgb(ColorR, ColorG, ColorB),
+            TargetFps, ColorCycleEnabled, ColorCycleSpeedHz, BarCornerRadius);
+
         public static SettingsDto FromDomain(EqualizerSettings s) => new SettingsDto
         {
             BarsCount = s.BarsCount,
@@ -77,7 +85,11 @@ public sealed class JsonSettingsRepository : ISettingsPort
             Smoothing = s.Smoothing,
             ColorR = s.Color.R,
             ColorG = s.Color.G,
-            ColorB = s.Color.B
+            ColorB = s.Color.B,
+            TargetFps = s.TargetFps,
+            ColorCycleEnabled = s.ColorCycleEnabled,
+            ColorCycleSpeedHz = s.ColorCycleSpeedHz,
+            BarCornerRadius = s.BarCornerRadius
         };
     }
 }

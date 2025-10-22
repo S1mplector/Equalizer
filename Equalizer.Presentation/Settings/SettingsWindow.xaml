@@ -8,6 +8,10 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -41,7 +45,22 @@
             <TextBox x:Name="ColorBValue" Margin="0,4,0,0"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Target FPS" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <Slider x:Name="FpsSlider" Grid.Row="4" Grid.Column="1" Minimum="10" Maximum="240" TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,8,0,0"/>
+        <TextBox x:Name="FpsValue" Grid.Row="4" Grid.Column="2" Margin="8,8,0,0"/>
+
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Cycle color" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <CheckBox x:Name="ColorCycleEnabled" Grid.Row="5" Grid.Column="1" VerticalAlignment="Center" Margin="0,8,0,0" Content="Enable"/>
+
+        <TextBlock Grid.Row="6" Grid.Column="0" Text="Cycle speed (Hz)" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <Slider x:Name="ColorCycleSpeed" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="5" TickFrequency="0.1" Margin="0,8,0,0"/>
+        <TextBox x:Name="ColorCycleSpeedValue" Grid.Row="6" Grid.Column="2" Margin="8,8,0,0"/>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Text="Bar corner radius" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <Slider x:Name="CornerRadiusSlider" Grid.Row="7" Grid.Column="1" Minimum="0" Maximum="16" TickFrequency="1" Margin="0,8,0,0"/>
+        <TextBox x:Name="CornerRadiusValue" Grid.Row="7" Grid.Column="2" Margin="8,8,0,0"/>
+
+        <StackPanel Grid.Row="9" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="SaveButton" Content="Save" Width="100" Margin="0,0,8,0"/>
             <Button x:Name="CancelButton" Content="Cancel" Width="100"/>
         </StackPanel>

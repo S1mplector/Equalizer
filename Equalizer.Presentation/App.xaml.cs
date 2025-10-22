@@ -15,6 +15,7 @@ namespace Equalizer.Presentation;
 public partial class App : System.Windows.Application
 {
     private IHost? _host;
+    public static bool IsShuttingDown { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -27,7 +28,7 @@ public partial class App : System.Windows.Application
                 services.AddEqualizerInfrastructure();
                 services.AddSingleton<IOverlayManager, MultiMonitorOverlayManager>();
                 services.AddTransient<Overlay.OverlayWindow>();
-                services.AddSingleton<Settings.SettingsWindow>();
+                services.AddTransient<Settings.SettingsWindow>();
                 services.AddHostedService<TrayIconHostedService>();
                 services.AddHostedService<GlobalHotkeyService>();
             })
@@ -39,6 +40,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        IsShuttingDown = true;
         if (_host != null)
         {
             _host.StopAsync().GetAwaiter().GetResult();

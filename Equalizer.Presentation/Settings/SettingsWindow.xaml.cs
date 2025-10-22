@@ -24,6 +24,9 @@ public partial class SettingsWindow : Window
         ColorR.ValueChanged += (_, __) => ColorRValue.Text = ((int)ColorR.Value).ToString();
         ColorG.ValueChanged += (_, __) => ColorGValue.Text = ((int)ColorG.Value).ToString();
         ColorB.ValueChanged += (_, __) => ColorBValue.Text = ((int)ColorB.Value).ToString();
+        FpsSlider.ValueChanged += (_, __) => FpsValue.Text = ((int)FpsSlider.Value).ToString();
+        ColorCycleSpeed.ValueChanged += (_, __) => ColorCycleSpeedValue.Text = ColorCycleSpeed.Value.ToString("0.00");
+        CornerRadiusSlider.ValueChanged += (_, __) => CornerRadiusValue.Text = CornerRadiusSlider.Value.ToString("0.0");
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -41,6 +44,14 @@ public partial class SettingsWindow : Window
         ColorRValue.Text = s.Color.R.ToString();
         ColorGValue.Text = s.Color.G.ToString();
         ColorBValue.Text = s.Color.B.ToString();
+
+        FpsSlider.Value = s.TargetFps;
+        FpsValue.Text = s.TargetFps.ToString();
+        ColorCycleEnabled.IsChecked = s.ColorCycleEnabled;
+        ColorCycleSpeed.Value = s.ColorCycleSpeedHz;
+        ColorCycleSpeedValue.Text = s.ColorCycleSpeedHz.ToString("0.00");
+        CornerRadiusSlider.Value = s.BarCornerRadius;
+        CornerRadiusValue.Text = s.BarCornerRadius.ToString("0.0");
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)
@@ -54,7 +65,12 @@ public partial class SettingsWindow : Window
             byte g = (byte)ColorG.Value;
             byte b = (byte)ColorB.Value;
 
-            var s = new EqualizerSettings(bars, resp, smooth, new ColorRgb(r, g, b));
+            int fps = (int)FpsSlider.Value;
+            bool cycle = ColorCycleEnabled.IsChecked == true;
+            double cycleHz = ColorCycleSpeed.Value;
+            double radius = CornerRadiusSlider.Value;
+
+            var s = new EqualizerSettings(bars, resp, smooth, new ColorRgb(r, g, b), fps, cycle, cycleHz, radius);
             await _settings.SaveAsync(s);
             Close();
         }

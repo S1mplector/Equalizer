@@ -5,19 +5,22 @@ using Equalizer.Presentation.Overlay;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 using WpfApp = System.Windows.Application;
+using System;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Equalizer.Presentation.Tray;
 
 public sealed class TrayIconHostedService : IHostedService
 {
     private readonly IOverlayManager _overlay;
-    private readonly Settings.SettingsWindow _settingsWindow;
+    private readonly IServiceProvider _services;
     private Forms.NotifyIcon? _icon;
 
-    public TrayIconHostedService(IOverlayManager overlay, Settings.SettingsWindow settingsWindow)
+    public TrayIconHostedService(IOverlayManager overlay, IServiceProvider services)
     {
         _overlay = overlay;
-        _settingsWindow = settingsWindow;
+        _services = services;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -50,14 +53,19 @@ public sealed class TrayIconHostedService : IHostedService
             var settingsItem = new Forms.ToolStripMenuItem("Settings...");
             settingsItem.Click += (_, __) =>
             {
-                if (!_settingsWindow.IsVisible)
+                if (App.IsShuttingDown) return;
+                var existing = WpfApp.Current.Windows.OfType<Settings.SettingsWindow>().FirstOrDefault();
+                if (existing == null || existing.IsLoaded == false)
                 {
-                    _settingsWindow.Show();
+                    var win = _services.GetRequiredService<Settings.SettingsWindow>();
+                    win.Show();
                 }
                 else
                 {
-                    _settingsWindow.Activate();
-                    _settingsWindow.Focus();
+                    if (existing.WindowState == System.Windows.WindowState.Minimized)
+                        existing.WindowState = System.Windows.WindowState.Normal;
+                    existing.Activate();
+                    existing.Focus();
                 }
             };
             var exitItem = new Forms.ToolStripMenuItem("Exit", null, (_, __) => WpfApp.Current.Shutdown());
