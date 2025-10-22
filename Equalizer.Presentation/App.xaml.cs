@@ -25,6 +25,8 @@ public partial class App : System.Windows.Application
                 services.AddEqualizerApplication();
                 services.AddEqualizerInfrastructure();
                 services.AddSingleton<IOverlayManager, MultiMonitorOverlayManager>();
+                services.AddTransient<Overlay.OverlayWindow>();
+                services.AddSingleton<Settings.SettingsWindow>();
                 services.AddHostedService<TrayIconHostedService>();
             })
             .Build();

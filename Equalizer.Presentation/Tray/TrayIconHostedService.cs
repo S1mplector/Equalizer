@@ -11,11 +11,13 @@ namespace Equalizer.Presentation.Tray;
 public sealed class TrayIconHostedService : IHostedService
 {
     private readonly IOverlayManager _overlay;
+    private readonly Settings.SettingsWindow _settingsWindow;
     private Forms.NotifyIcon? _icon;
 
-    public TrayIconHostedService(IOverlayManager overlay)
+    public TrayIconHostedService(IOverlayManager overlay, Settings.SettingsWindow settingsWindow)
     {
         _overlay = overlay;
+        _settingsWindow = settingsWindow;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -45,6 +47,19 @@ public sealed class TrayIconHostedService : IHostedService
                 await _overlay.ToggleAlwaysOnTopAsync();
                 alwaysOnTopItem.Checked = _overlay.AlwaysOnTop;
             };
+            var settingsItem = new Forms.ToolStripMenuItem("Settings...");
+            settingsItem.Click += (_, __) =>
+            {
+                if (!_settingsWindow.IsVisible)
+                {
+                    _settingsWindow.Show();
+                }
+                else
+                {
+                    _settingsWindow.Activate();
+                    _settingsWindow.Focus();
+                }
+            };
             var exitItem = new Forms.ToolStripMenuItem("Exit", null, (_, __) => WpfApp.Current.Shutdown());
 
             contextMenu.Items.Add(showItem);
@@ -53,6 +68,7 @@ public sealed class TrayIconHostedService : IHostedService
             contextMenu.Items.Add(new Forms.ToolStripSeparator());
             contextMenu.Items.Add(clickThroughItem);
             contextMenu.Items.Add(alwaysOnTopItem);
+            contextMenu.Items.Add(settingsItem);
             contextMenu.Items.Add(new Forms.ToolStripSeparator());
             contextMenu.Items.Add(exitItem);
             _icon.ContextMenuStrip = contextMenu;

@@ -2300,6 +2300,7 @@
   "projectFileDependencyGroups": {
     "net8.0-windows7.0": [
       "Equalizer.Application >= 1.0.0",
+      "Equalizer.Domain >= 1.0.0",
       "Equalizer.Infrastructure >= 1.0.0",
       "Microsoft.Extensions.Hosting >= 8.0.0"
     ]
@@ -2331,6 +2332,9 @@
           "projectReferences": {
             "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Application\\Equalizer.Application.csproj": {
               "projectPath": "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Application\\Equalizer.Application.csproj"
+            },
+            "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Domain\\Equalizer.Domain.csproj": {
+              "projectPath": "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Domain\\Equalizer.Domain.csproj"
             },
             "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Infrastructure\\Equalizer.Infrastructure.csproj": {
               "projectPath": "C:\\Users\\Sim\\Desktop\\Files\\Projects\\Equalizer\\Equalizer.Infrastructure\\Equalizer.Infrastructure.csproj"

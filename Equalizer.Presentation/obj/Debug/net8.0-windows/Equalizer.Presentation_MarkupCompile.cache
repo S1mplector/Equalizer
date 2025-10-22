@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
 C:\Users\Sim\Desktop\Files\Projects\Equalizer\Equalizer.Presentation\App.xaml
-2353594962
+3149683818
 
-101229791945
+111577723852
 245-852254231
-MainWindow.xaml;Overlay\OverlayWindow.xaml;
+MainWindow.xaml;Overlay\OverlayWindow.xaml;Settings\SettingsWindow.xaml;
 
-True
+False
 

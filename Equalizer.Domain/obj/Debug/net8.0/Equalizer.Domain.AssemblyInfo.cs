@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Equalizer.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dd5daa8a5da62a167bb8ace382cdd399819c29d0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1cb638985832297d67108b36d24455b8d423501c")]
 [assembly: System.Reflection.AssemblyProductAttribute("Equalizer.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Equalizer.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

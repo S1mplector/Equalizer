@@ -9,6 +9,7 @@
       "Equalizer.Presentation/1.0.0": {
         "dependencies": {
           "Equalizer.Application": "1.0.0",
+          "Equalizer.Domain": "1.0.0",
           "Equalizer.Infrastructure": "1.0.0",
           "Microsoft.Extensions.Hosting": "8.0.0"
         },

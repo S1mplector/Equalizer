@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Equalizer.Application\Equalizer.Application.csproj" />
     <ProjectReference Include="..\Equalizer.Infrastructure\Equalizer.Infrastructure.csproj" />
+    <ProjectReference Include="..\Equalizer.Domain\Equalizer.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
