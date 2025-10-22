@@ -86,3 +86,7 @@ Equalizer.Presentation/bin/
 Equalizer.Presentation/obj/
 Equalizer.Tests/bin/
 Equalizer.Tests/obj/
+
+# Recursive safety (fuck git, should have done this a while ago)
+**/bin/
+**/obj/

@@ -22,6 +22,7 @@ public partial class OverlayWindow : Window
     private SolidColorBrush _barBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 128));
     private DateTime _lastFrame = DateTime.MinValue;
     private double _cyclePhase;
+    private double _beatPulse;
 
     public OverlayWindow(IEqualizerService service, ISettingsPort settings)
     {
@@ -59,7 +60,8 @@ public partial class OverlayWindow : Window
             }
             _lastFrame = now;
 
-            var data = await _service.GetBarsAsync(_cts.Token);
+            var vf = await _service.GetVisualizerFrameAsync(_cts.Token);
+            var data = vf.Bars;
             EnsureBars(data.Length);
 
             var width = BarsCanvas.ActualWidth;
@@ -77,14 +79,19 @@ public partial class OverlayWindow : Window
                 var rgb = HsvToRgb(_cyclePhase, 1.0, 1.0);
                 color = new ColorRgb((byte)rgb.r, (byte)rgb.g, (byte)rgb.b);
             }
-            if (_barBrush.Color != System.Windows.Media.Color.FromRgb(color.R, color.G, color.B))
-            {
-                _barBrush.Color = System.Windows.Media.Color.FromRgb(color.R, color.G, color.B);
-            }
+            // Beat pulse
+            if (vf.IsBeat) _beatPulse = Math.Min(1.0, _beatPulse + vf.BeatStrength * 0.8);
+            _beatPulse *= 0.9; // decay
+
+            var baseColor = System.Windows.Media.Color.FromRgb(color.R, color.G, color.B);
+            var pulsed = LerpColor(baseColor, System.Windows.Media.Colors.White, (float)(0.35 * _beatPulse));
+            if (_barBrush.Color != pulsed) _barBrush.Color = pulsed;
 
             for (int i = 0; i < data.Length; i++)
             {
-                var h = Math.Max(1.0, data[i] * height);
+                // Slight bass/treble emphasis and beat pulse scaling
+                var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
+                var h = Math.Max(1.0, data[i] * height * scale);
                 var left = i * (barWidth + spacing);
                 var top = height - h;
                 var rect = _bars[i];
