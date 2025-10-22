@@ -5,6 +5,7 @@ using Equalizer.Application.DependencyInjection;
 using Equalizer.Infrastructure.DependencyInjection;
 using Equalizer.Presentation.Overlay;
 using Equalizer.Presentation.Tray;
+using Equalizer.Presentation.Hotkeys;
 
 namespace Equalizer.Presentation;
 
@@ -28,6 +29,7 @@ public partial class App : System.Windows.Application
                 services.AddTransient<Overlay.OverlayWindow>();
                 services.AddSingleton<Settings.SettingsWindow>();
                 services.AddHostedService<TrayIconHostedService>();
+                services.AddHostedService<GlobalHotkeyService>();
             })
             .Build();
 
