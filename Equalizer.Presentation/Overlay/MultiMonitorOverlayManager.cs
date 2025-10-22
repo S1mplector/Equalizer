@@ -6,19 +6,23 @@ using System.Windows;
 using Equalizer.Presentation.Interop;
 using Forms = System.Windows.Forms;
 using Microsoft.Extensions.DependencyInjection;
+using Equalizer.Application.Abstractions;
+using Equalizer.Domain;
 
 namespace Equalizer.Presentation.Overlay;
 
 public sealed class MultiMonitorOverlayManager : IOverlayManager
 {
     private readonly IServiceProvider _services;
+    private readonly ISettingsPort _settings;
     private readonly Dictionary<string, OverlayWindow> _windows = new();
     private bool _clickThrough;
     private bool _alwaysOnTop;
 
-    public MultiMonitorOverlayManager(IServiceProvider services)
+    public MultiMonitorOverlayManager(IServiceProvider services, ISettingsPort settings)
     {
         _services = services;
+        _settings = settings;
     }
 
     public bool IsVisible => _windows.Values.Any(w => w.IsVisible);
@@ -27,13 +31,22 @@ public sealed class MultiMonitorOverlayManager : IOverlayManager
 
     public async Task ShowAsync()
     {
+        var s = await _settings.GetAsync();
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            EnsureWindows();
-            foreach (var win in _windows.Values)
+            var targets = GetTargetScreens(s);
+            EnsureWindows(targets);
+            foreach (var kv in _windows)
             {
-                if (!win.IsVisible) win.Show();
-                ApplyStyles(win);
+                if (targets.Any(sc => sc.DeviceName == kv.Key))
+                {
+                    if (!kv.Value.IsVisible) kv.Value.Show();
+                    ApplyStyles(kv.Value);
+                }
+                else
+                {
+                    if (kv.Value.IsVisible) kv.Value.Hide();
+                }
             }
         });
     }
@@ -83,9 +96,9 @@ public sealed class MultiMonitorOverlayManager : IOverlayManager
 
     public Task ToggleAlwaysOnTopAsync() => SetAlwaysOnTopAsync(!_alwaysOnTop);
 
-    private void EnsureWindows()
+    private void EnsureWindows(IEnumerable<Forms.Screen> targetScreens)
     {
-        var screens = Forms.Screen.AllScreens;
+        var screens = targetScreens;
         var keys = _windows.Keys.ToHashSet();
         var existing = new HashSet<string>();
 

@@ -12,6 +12,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -44,6 +46,7 @@
             <TextBox x:Name="ColorGValue" Margin="0,4,0,0"/>
             <TextBox x:Name="ColorBValue" Margin="0,4,0,0"/>
         </StackPanel>
+        <Button x:Name="PickColorButton" Grid.Row="3" Grid.ColumnSpan="3" Content="Pick Color..." HorizontalAlignment="Left" Margin="0,8,0,0"/>
 
         <TextBlock Grid.Row="4" Grid.Column="0" Text="Target FPS" VerticalAlignment="Center" Margin="0,8,8,0"/>
         <Slider x:Name="FpsSlider" Grid.Row="4" Grid.Column="1" Minimum="10" Maximum="240" TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,8,0,0"/>
@@ -60,7 +63,17 @@
         <Slider x:Name="CornerRadiusSlider" Grid.Row="7" Grid.Column="1" Minimum="0" Maximum="16" TickFrequency="1" Margin="0,8,0,0"/>
         <TextBox x:Name="CornerRadiusValue" Grid.Row="7" Grid.Column="2" Margin="8,8,0,0"/>
 
-        <StackPanel Grid.Row="9" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="Display on" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <ComboBox x:Name="DisplayModeCombo" Grid.Row="8" Grid.Column="1" Margin="0,8,0,0">
+            <ComboBoxItem Content="All monitors" Tag="0" />
+            <ComboBoxItem Content="Primary monitor only" Tag="1" />
+            <ComboBoxItem Content="Specific monitor" Tag="2" />
+        </ComboBox>
+
+        <TextBlock Grid.Row="9" Grid.Column="0" Text="Monitor" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <ComboBox x:Name="MonitorCombo" Grid.Row="9" Grid.Column="1" Margin="0,8,0,0" IsEnabled="False"/>
+
+        <StackPanel Grid.Row="11" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="SaveButton" Content="Save" Width="100" Margin="0,0,8,0"/>
             <Button x:Name="CancelButton" Content="Cancel" Width="100"/>
         </StackPanel>
