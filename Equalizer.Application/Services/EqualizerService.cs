@@ -36,15 +36,33 @@ public sealed class EqualizerService : IEqualizerService
         var settings = await _settings.GetAsync();
         var audioFrame = await _audio.ReadFrameAsync(minSamples: 1024, cancellationToken);
 
-        // Spectrum and bars
-        var mag = _processor.ComputeMagnitudes(audioFrame);
-        var rawBars = _processor.ComputeBarsFromMagnitudes(mag, audioFrame.SampleRate, settings.BarsCount);
+        // Silence detection to prevent backlog-looking playback after pause
+        double rms = 0;
+        var samps = audioFrame.Samples;
+        for (int i = 0; i < samps.Length; i++) { double v = samps[i]; rms += v * v; }
+        rms = samps.Length > 0 ? Math.Sqrt(rms / samps.Length) : 0;
+        bool isSilent = rms < 2e-4; // tuned threshold for normalized float audio
+
+        double[] mag;
+        float[] rawBars;
+        if (isSilent)
+        {
+            mag = _prevMag is { Length: > 0 } ? new double[_prevMag.Length] : Array.Empty<double>();
+            rawBars = new float[settings.BarsCount];
+        }
+        else
+        {
+            // Spectrum and bars
+            mag = _processor.ComputeMagnitudes(audioFrame);
+            rawBars = _processor.ComputeBarsFromMagnitudes(mag, audioFrame.SampleRate, settings.BarsCount);
+        }
 
         if (_previous == null || _previous.Length != rawBars.Length)
             _previous = new float[rawBars.Length];
 
         var output = new float[rawBars.Length];
         var smoothing = Math.Clamp(settings.Smoothing, 0.0, 1.0);
+        if (isSilent) smoothing = Math.Min(smoothing, 0.2); // faster decay on silence
         var responsiveness = Math.Clamp(settings.Responsiveness, 0.0, 1.0);
         for (int i = 0; i < rawBars.Length; i++)
         {
@@ -59,6 +77,7 @@ public sealed class EqualizerService : IEqualizerService
         double nyquist = audioFrame.SampleRate / 2.0;
         float band(string name, double f1, double f2)
         {
+            if (mag.Length == 0) return 0f;
             int i1 = (int)Math.Clamp(Math.Round(f1 / nyquist * (mag.Length - 1)), 1, mag.Length - 1);
             int i2 = (int)Math.Clamp(Math.Round(f2 / nyquist * (mag.Length - 1)), i1 + 1, mag.Length - 1);
             double sum = 0; int cnt = 0;
@@ -72,13 +91,23 @@ public sealed class EqualizerService : IEqualizerService
 
         // Spectral flux beat detection
         double flux = 0;
-        if (_prevMag == null || _prevMag.Length != mag.Length) _prevMag = new double[mag.Length];
-        for (int i = 0; i < mag.Length; i++)
+        if (isSilent)
         {
-            var diff = mag[i] - _prevMag[i];
-            if (diff > 0) flux += diff;
+            // Reset beat state on silence
+            if (_prevMag != null) Array.Clear(_prevMag, 0, _prevMag.Length);
+            Array.Clear(_fluxHistory, 0, _fluxHistory.Length);
+            _fluxIndex = 0; _fluxCount = 0;
         }
-        Array.Copy(mag, _prevMag, mag.Length);
+        else
+        {
+            if (_prevMag == null || _prevMag.Length != mag.Length) _prevMag = new double[mag.Length];
+            for (int i = 0; i < mag.Length; i++)
+            {
+                var diff = mag[i] - _prevMag[i];
+                if (diff > 0) flux += diff;
+            }
+            Array.Copy(mag, _prevMag, mag.Length);
+        }
 
         // Maintain history
         _fluxHistory[_fluxIndex] = flux;
@@ -86,13 +115,13 @@ public sealed class EqualizerService : IEqualizerService
         _fluxCount = Math.Min(_fluxCount + 1, _fluxHistory.Length);
 
         double mean = 0; for (int i = 0; i < _fluxCount; i++) mean += _fluxHistory[i]; mean /= Math.Max(1, _fluxCount);
-        double var = 0; for (int i = 0; i < _fluxCount; i++) { var += ( _fluxHistory[i] - mean) * (_fluxHistory[i] - mean); }
+        double var = 0; for (int i = 0; i < _fluxCount; i++) { var += (_fluxHistory[i] - mean) * (_fluxHistory[i] - mean); }
         var /= Math.Max(1, _fluxCount);
         double std = Math.Sqrt(var);
         double threshold = mean + 1.5 * std;
-        bool isBeat = flux > threshold && flux > 1e-6;
-        float beatStrength = isBeat ? (float)Math.Clamp((flux - threshold) / Math.Max(threshold, 1e-6), 0.0, 1.0) : 0f;
+        bool isBeatFlag = !isSilent && flux > threshold && flux > 1e-6;
+        float beatStrength = isBeatFlag ? (float)Math.Clamp((flux - threshold) / Math.Max(threshold, 1e-6), 0.0, 1.0) : 0f;
 
-        return new VisualizerFrame(output, bass, mid, treble, isBeat, beatStrength);
+        return new VisualizerFrame(output, bass, mid, treble, isBeatFlag, beatStrength);
     }
 }
