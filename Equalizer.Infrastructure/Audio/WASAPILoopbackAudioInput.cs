@@ -17,6 +17,7 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
     private readonly SemaphoreSlim _dataAvailable = new(0);
     private bool _disposed;
     private readonly int _maxQueueSamples;
+    private float[]? _prevFrame;
 
     public int SampleRate { get; }
     public int Channels { get; }
@@ -216,37 +217,45 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
     public async Task<AudioFrame> ReadFrameAsync(int minSamples, CancellationToken cancellationToken)
     {
         if (minSamples <= 0) minSamples = 2048;
-        float[] buffer = new float[minSamples];
+        int hop = Math.Max(minSamples / 2, 1);
+        if (_prevFrame != null && _prevFrame.Length != minSamples)
+            _prevFrame = null;
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            int copied = 0;
+            int need = _prevFrame == null ? minSamples : hop;
+            bool haveEnough;
             lock (_lock)
             {
-                while (_queue.Count > 0 && copied < minSamples)
+                haveEnough = _queue.Count >= need;
+            }
+            if (!haveEnough)
+            {
+                await _dataAvailable.WaitAsync(TimeSpan.FromMilliseconds(15), cancellationToken);
+                continue;
+            }
+
+            float[] frame = new float[minSamples];
+            int keep = minSamples - hop;
+            int copied = 0;
+            if (_prevFrame != null)
+            {
+                Array.Copy(_prevFrame, _prevFrame.Length - keep, frame, 0, keep);
+                copied = keep;
+            }
+
+            int toDequeue = _prevFrame == null ? minSamples : hop;
+            lock (_lock)
+            {
+                for (int i = 0; i < toDequeue; i++)
                 {
-                    buffer[copied++] = _queue.Dequeue();
+                    frame[copied++] = _queue.Dequeue();
                 }
             }
-            if (copied >= minSamples)
-            {
-                if (copied == minSamples)
-                    return new AudioFrame(buffer, SampleRate);
-                // If more were available (shouldn't happen with the logic above), truncate.
-                var exact = new float[minSamples];
-                Array.Copy(buffer, exact, minSamples);
-                return new AudioFrame(exact, SampleRate);
-            }
-            // If we have at least half the samples, return zero-padded for responsiveness
-            if (copied >= minSamples / 2)
-            {
-                var exact = new float[minSamples];
-                Array.Copy(buffer, exact, copied);
-                // remaining are zeros by default
-                return new AudioFrame(exact, SampleRate);
-            }
-            await _dataAvailable.WaitAsync(TimeSpan.FromMilliseconds(15), cancellationToken);
+
+            _prevFrame = frame;
+            return new AudioFrame(frame, SampleRate);
         }
     }
 
