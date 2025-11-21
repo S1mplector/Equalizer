@@ -33,6 +33,7 @@ public partial class SettingsWindow : Window
         CornerRadiusSlider.ValueChanged += (_, __) => CornerRadiusValue.Text = CornerRadiusSlider.Value.ToString("0.0");
         DisplayModeCombo.SelectionChanged += OnDisplayModeChanged;
         PickColorButton.Click += OnPickColor;
+        ProfileCombo.SelectionChanged += OnProfileChanged;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -92,6 +93,9 @@ public partial class SettingsWindow : Window
         SetVisualizerModeSelection(s.VisualizerMode);
         CircleDiameterSlider.Value = s.CircleDiameter;
         CircleDiameterValue.Text = s.CircleDiameter.ToString("0");
+
+        // Performance profile (infer from current values)
+        SetProfileFromCurrentValues();
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)
@@ -184,6 +188,65 @@ public partial class SettingsWindow : Window
             };
         }
         return MonitorDisplayMode.All;
+    }
+
+    private void OnProfileChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProfileCombo.SelectedItem is not ComboBoxItem item) return;
+        var tag = (item.Tag as string) ?? "custom";
+
+        switch (tag)
+        {
+            case "smooth":
+                RespSlider.Value = 0.6;
+                SmoothSlider.Value = 0.8;
+                FpsSlider.Value = 60;
+                break;
+            case "balanced":
+                RespSlider.Value = 0.7;
+                SmoothSlider.Value = 0.5;
+                FpsSlider.Value = 60;
+                break;
+            case "low":
+                RespSlider.Value = 0.9;
+                SmoothSlider.Value = 0.25;
+                FpsSlider.Value = 144;
+                break;
+            default:
+                // custom: do nothing, user controls sliders
+                break;
+        }
+    }
+
+    private void SetProfileFromCurrentValues()
+    {
+        double resp = RespSlider.Value;
+        double smooth = SmoothSlider.Value;
+        int fps = (int)FpsSlider.Value;
+
+        string tag = "custom";
+
+        if (Math.Abs(resp - 0.7) < 0.01 && Math.Abs(smooth - 0.5) < 0.02 && fps == 60)
+        {
+            tag = "balanced";
+        }
+        else if (Math.Abs(resp - 0.6) < 0.05 && Math.Abs(smooth - 0.8) < 0.05 && fps == 60)
+        {
+            tag = "smooth";
+        }
+        else if (resp >= 0.85 && smooth <= 0.3 && fps >= 120)
+        {
+            tag = "low";
+        }
+
+        foreach (ComboBoxItem item in ProfileCombo.Items)
+        {
+            if (string.Equals((item.Tag as string) ?? "", tag, StringComparison.OrdinalIgnoreCase))
+            {
+                ProfileCombo.SelectedItem = item;
+                return;
+            }
+        }
     }
 
     private void SetVisualizerModeSelection(VisualizerMode mode)

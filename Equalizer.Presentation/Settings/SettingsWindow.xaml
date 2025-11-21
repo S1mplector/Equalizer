@@ -22,6 +22,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -91,6 +92,14 @@
         <TextBlock Grid.Row="11" Grid.Column="0" Text="Circle diameter" VerticalAlignment="Center" Margin="0,8,8,0"/>
         <Slider x:Name="CircleDiameterSlider" Grid.Row="11" Grid.Column="1" Minimum="100" Maximum="2000" TickFrequency="50" Margin="0,8,0,0"/>
         <TextBox x:Name="CircleDiameterValue" Grid.Row="11" Grid.Column="2" Margin="8,8,0,0"/>
+
+        <TextBlock Grid.Row="12" Grid.Column="0" Text="Performance profile" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <ComboBox x:Name="ProfileCombo" Grid.Row="12" Grid.Column="1" Margin="0,8,0,0">
+            <ComboBoxItem Content="Custom" Tag="custom" />
+            <ComboBoxItem Content="Smooth" Tag="smooth" />
+            <ComboBoxItem Content="Balanced" Tag="balanced" />
+            <ComboBoxItem Content="Low latency" Tag="low" />
+        </ComboBox>
 
         </Grid>
         </ScrollViewer>

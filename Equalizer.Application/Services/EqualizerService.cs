@@ -70,7 +70,23 @@ public sealed class EqualizerService : IEqualizerService
     {
         try
         {
-            var audioFrame = await _audio.ReadFrameAsync(minSamples: 1024, cancellationToken);
+            int minSamples;
+            if (settings.Smoothing <= 0.3 && settings.TargetFps >= 120)
+            {
+                // Low-latency profile: smaller window for faster reaction
+                minSamples = 512;
+            }
+            else if (settings.Smoothing >= 0.7 && settings.TargetFps <= 60)
+            {
+                // Smooth profile: larger window for more stable spectrum
+                minSamples = 2048;
+            }
+            else
+            {
+                minSamples = 1024;
+            }
+
+            var audioFrame = await _audio.ReadFrameAsync(minSamples, cancellationToken);
 
         // Silence detection to prevent backlog-looking playback after pause
         double rms = 0;
