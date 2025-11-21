@@ -6,6 +6,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
         <Grid Margin="12">
@@ -116,7 +117,17 @@
 
         </Grid>
         </ScrollViewer>
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12,8,12,12">
+
+        <StatusBar Grid.Row="1" Margin="8,0,8,0">
+            <StatusBarItem>
+                <TextBlock x:Name="CpuUsageText" Text="CPU: -- %" Margin="0,0,16,0" />
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock x:Name="MemoryUsageText" Text="RAM: -- MB" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12,8,12,12">
             <Button x:Name="SaveButton" Content="Save" Width="100" Margin="0,0,8,0"/>
             <Button x:Name="CancelButton" Content="Cancel" Width="100"/>
         </StackPanel>

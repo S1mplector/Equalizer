@@ -1,6 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Equalizer.Application.Abstractions;
 using Equalizer.Domain;
 using Equalizer.Presentation.Controls;
@@ -12,6 +14,10 @@ public partial class SettingsWindow : Window
 {
     private readonly ISettingsPort _settings;
     private readonly Overlay.IOverlayManager _overlay;
+    private readonly DispatcherTimer _resourceTimer;
+    private readonly Process _currentProcess;
+    private TimeSpan _lastCpuTime;
+    private DateTime _lastCpuSample;
 
     public SettingsWindow(ISettingsPort settings, Overlay.IOverlayManager overlay)
     {
@@ -36,6 +42,49 @@ public partial class SettingsWindow : Window
         ProfileCombo.SelectionChanged += OnProfileChanged;
         FadeOutSlider.ValueChanged += (_, __) => FadeOutValue.Text = FadeOutSlider.Value.ToString("0.00");
         FadeInSlider.ValueChanged += (_, __) => FadeInValue.Text = FadeInSlider.Value.ToString("0.00");
+
+        _currentProcess = Process.GetCurrentProcess();
+        _lastCpuTime = _currentProcess.TotalProcessorTime;
+        _lastCpuSample = DateTime.UtcNow;
+
+        _resourceTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _resourceTimer.Tick += ResourceTimer_Tick;
+        _resourceTimer.Start();
+
+        Closed += (_, __) => _resourceTimer.Stop();
+    }
+
+    private void ResourceTimer_Tick(object? sender, EventArgs e)
+    {
+        try
+        {
+            _currentProcess.Refresh();
+            var now = DateTime.UtcNow;
+            var cpuTime = _currentProcess.TotalProcessorTime;
+
+            var cpuDeltaMs = (cpuTime - _lastCpuTime).TotalMilliseconds;
+            var wallDeltaMs = (now - _lastCpuSample).TotalMilliseconds;
+            double cpuPercent = 0.0;
+            if (wallDeltaMs > 10)
+            {
+                cpuPercent = cpuDeltaMs / (wallDeltaMs * Environment.ProcessorCount) * 100.0;
+            }
+
+            _lastCpuTime = cpuTime;
+            _lastCpuSample = now;
+
+            var memMb = _currentProcess.WorkingSet64 / (1024.0 * 1024.0);
+
+            CpuUsageText.Text = $"CPU: {cpuPercent:0.0}%";
+            MemoryUsageText.Text = $"RAM: {memMb:0.0} MB";
+        }
+        catch
+        {
+            // Non-fatal: best-effort diagnostics only
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
