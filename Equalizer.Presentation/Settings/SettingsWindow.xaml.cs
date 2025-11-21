@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Equalizer.Application.Abstractions;
 using Equalizer.Domain;
+using Equalizer.Presentation.Controls;
 using Forms = System.Windows.Forms;
 
 namespace Equalizer.Presentation.Settings;
@@ -86,6 +87,11 @@ public partial class SettingsWindow : Window
         // Display mode
         SetDisplayModeSelection(s.DisplayMode);
         MonitorCombo.IsEnabled = s.DisplayMode == MonitorDisplayMode.Specific;
+
+        // Visualizer mode & circle diameter
+        SetVisualizerModeSelection(s.VisualizerMode);
+        CircleDiameterSlider.Value = s.CircleDiameter;
+        CircleDiameterValue.Text = s.CircleDiameter.ToString("0");
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)
@@ -105,11 +111,13 @@ public partial class SettingsWindow : Window
             double radius = CornerRadiusSlider.Value;
 
             var displayMode = GetSelectedDisplayMode();
+            var visualizerMode = GetSelectedVisualizerMode();
+            double circleDiameter = CircleDiameterSlider.Value;
             string? deviceName = null;
             if (displayMode == MonitorDisplayMode.Specific && MonitorCombo.SelectedItem is ComboBoxItem sel)
                 deviceName = sel.Tag as string;
 
-            var s = new EqualizerSettings(bars, resp, smooth, new ColorRgb(r, g, b), fps, cycle, cycleHz, radius, displayMode, deviceName);
+            var s = new EqualizerSettings(bars, resp, smooth, new ColorRgb(r, g, b), fps, cycle, cycleHz, radius, displayMode, deviceName, visualizerMode, circleDiameter);
             await _settings.SaveAsync(s);
 
             // Immediately reflect changes in overlays
@@ -132,18 +140,17 @@ public partial class SettingsWindow : Window
 
     private void OnPickColor(object? sender, RoutedEventArgs e)
     {
-        using var dlg = new Forms.ColorDialog
+        var initial = new ColorRgb((byte)ColorR.Value, (byte)ColorG.Value, (byte)ColorB.Value);
+        var picker = new ColorPickerWindow(initial)
         {
-            AllowFullOpen = true,
-            AnyColor = true,
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb((int)ColorR.Value, (int)ColorG.Value, (int)ColorB.Value)
+            Owner = this
         };
-        if (dlg.ShowDialog() == Forms.DialogResult.OK)
+        if (picker.ShowDialog() == true)
         {
-            ColorR.Value = dlg.Color.R;
-            ColorG.Value = dlg.Color.G;
-            ColorB.Value = dlg.Color.B;
+            var c = picker.SelectedColor;
+            ColorR.Value = c.R;
+            ColorG.Value = c.G;
+            ColorB.Value = c.B;
         }
     }
 
@@ -177,5 +184,35 @@ public partial class SettingsWindow : Window
             };
         }
         return MonitorDisplayMode.All;
+    }
+
+    private void SetVisualizerModeSelection(VisualizerMode mode)
+    {
+        int tag = mode switch
+        {
+            VisualizerMode.Circular => 1,
+            _ => 0
+        };
+        foreach (ComboBoxItem item in VisualizerModeCombo.Items)
+        {
+            if (int.TryParse(item.Tag?.ToString(), out int t) && t == tag)
+            {
+                VisualizerModeCombo.SelectedItem = item;
+                return;
+            }
+        }
+    }
+
+    private VisualizerMode GetSelectedVisualizerMode()
+    {
+        if (VisualizerModeCombo.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out int t))
+        {
+            return t switch
+            {
+                1 => VisualizerMode.Circular,
+                _ => VisualizerMode.Bars
+            };
+        }
+        return VisualizerMode.Bars;
     }
 }

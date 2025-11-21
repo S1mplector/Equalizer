@@ -88,4 +88,6 @@ public sealed class OverlayManager : IOverlayManager
         window.Topmost = false;
         window.WindowState = WindowState.Maximized;
     }
+
+    public Task ResetPositionAsync() => Task.CompletedTask;
 }

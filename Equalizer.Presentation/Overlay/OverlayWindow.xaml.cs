@@ -9,7 +9,7 @@ using System.Windows.Threading;
 using Equalizer.Application.Abstractions;
 using Equalizer.Application.Models;
 using Equalizer.Domain;
-using Forms = System.Windows.Forms;
+using Equalizer.Presentation.Controls;
 
 namespace Equalizer.Presentation.Overlay;
 
@@ -54,7 +54,10 @@ public partial class OverlayWindow : Window
         CancelMoveButton.Click += CancelMoveButton_Click;
         QuickApplyButton.Click += QuickApplyButton_Click;
         QuickCancelButton.Click += QuickCancelButton_Click;
-        QuickColorButton.Click += QuickColorButton_Click;
+        QuickColorR.ValueChanged += QuickColorSlider_ValueChanged;
+        QuickColorG.ValueChanged += QuickColorSlider_ValueChanged;
+        QuickColorB.ValueChanged += QuickColorSlider_ValueChanged;
+        QuickEyedropperButton.Click += QuickEyedropperButton_Click;
         _ = ApplyInitialOffsetAsync();
     }
 
@@ -99,14 +102,12 @@ public partial class OverlayWindow : Window
             var vf = _lastFrameData;
             if (vf == null) return;
             var data = vf.Bars;
-            EnsureBars(data.Length);
 
             var width = BarsCanvas.ActualWidth;
             var height = BarsCanvas.ActualHeight;
             if (width <= 0 || height <= 0) return;
 
             var spacing = 2.0;
-            var barWidth = Math.Max(1.0, (width - spacing * (data.Length - 1)) / data.Length);
 
             var color = s.Color;
             if (s.ColorCycleEnabled)
@@ -124,36 +125,100 @@ public partial class OverlayWindow : Window
             var pulsed = LerpColor(baseColor, System.Windows.Media.Colors.White, (float)(0.35 * _beatPulse));
             if (_barBrush.Color != pulsed) _barBrush.Color = pulsed;
 
-            for (int i = 0; i < data.Length; i++)
+            if (s.VisualizerMode == VisualizerMode.Circular)
             {
-                // Slight bass/treble emphasis and beat pulse scaling
-                var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
-                var h = Math.Max(1.0, data[i] * height * scale);
-                var left = i * (barWidth + spacing);
-                var top = height - h;
-                var rect = _bars[i];
-                rect.Width = barWidth;
-                rect.Height = h;
-                rect.RadiusX = s.BarCornerRadius;
-                rect.RadiusY = s.BarCornerRadius;
-                Canvas.SetLeft(rect, left);
-                Canvas.SetTop(rect, top);
-
-                if (_peaks == null || _peaks.Length != data.Length) _peaks = new float[data.Length];
-                var amp = (float)Math.Clamp(data[i] * scale, 0.0, 1.0);
-                var decayed = _peaks[i] * 0.985f;
-                _peaks[i] = Math.Max(decayed, amp);
-                var peakH = Math.Max(1.0, _peaks[i] * height);
-                var peakRect = _peakBars[i];
-                peakRect.Width = barWidth;
-                peakRect.Height = Math.Max(2.0, Math.Min(4.0, height * 0.01));
-                Canvas.SetLeft(peakRect, left);
-                Canvas.SetTop(peakRect, Math.Max(0.0, height - peakH - peakRect.Height));
+                RenderCircular(vf, data, s, width, height);
+            }
+            else
+            {
+                EnsureBars(data.Length);
+                RenderLinearBars(vf, data, s, width, height, spacing);
             }
         }
         finally
         {
             _rendering = false;
+        }
+    }
+
+    private void RenderLinearBars(VisualizerFrame vf, float[] data, EqualizerSettings s, double width, double height, double spacing)
+    {
+        var barWidth = Math.Max(1.0, (width - spacing * (data.Length - 1)) / data.Length);
+        for (int i = 0; i < data.Length; i++)
+        {
+            // Slight bass/treble emphasis and beat pulse scaling
+            var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
+            var h = Math.Max(1.0, data[i] * height * scale);
+            var left = i * (barWidth + spacing);
+            var top = height - h;
+            var rect = _bars[i];
+            rect.Width = barWidth;
+            rect.Height = h;
+            rect.RadiusX = s.BarCornerRadius;
+            rect.RadiusY = s.BarCornerRadius;
+            Canvas.SetLeft(rect, left);
+            Canvas.SetTop(rect, top);
+
+            if (_peaks == null || _peaks.Length != data.Length) _peaks = new float[data.Length];
+            var amp = (float)Math.Clamp(data[i] * scale, 0.0, 1.0);
+            var decayed = _peaks[i] * 0.985f;
+            _peaks[i] = Math.Max(decayed, amp);
+            var peakH = Math.Max(1.0, _peaks[i] * height);
+            var peakRect = _peakBars[i];
+            peakRect.Width = barWidth;
+            peakRect.Height = Math.Max(2.0, Math.Min(4.0, height * 0.01));
+            Canvas.SetLeft(peakRect, left);
+            Canvas.SetTop(peakRect, Math.Max(0.0, height - peakH - peakRect.Height));
+        }
+    }
+
+    private void RenderCircular(VisualizerFrame vf, float[] data, EqualizerSettings s, double width, double height)
+    {
+        BarsCanvas.Children.Clear();
+        if (data.Length == 0) return;
+
+        var cx = width / 2.0;
+        var cy = height / 2.0;
+        var maxRadius = Math.Min(width, height) / 2.0;
+        var targetRadius = Math.Min(s.CircleDiameter / 2.0, maxRadius * 0.9);
+
+        // Keep a fairly open center and a thinner active ring for a cleaner look
+        var innerRadius = targetRadius * 0.55;
+        var outerRadius = targetRadius;
+
+        // Derive stroke thickness from angular spacing so bars don't merge into a solid ring
+        var angleStep = 2.0 * Math.PI / data.Length;
+        var arcPerBar = targetRadius * angleStep; // arc length at target radius per bar
+        var thickness = arcPerBar * 0.55;        // use ~55% of available arc to leave visible gaps
+        thickness = Math.Clamp(thickness, 1.5, targetRadius * 0.15);
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
+            var amp = Math.Clamp(data[i] * scale, 0.0, 1.0);
+            var radius = innerRadius + (outerRadius - innerRadius) * amp;
+
+            var angle = 2.0 * Math.PI * i / data.Length;
+            var cos = Math.Cos(angle);
+            var sin = Math.Sin(angle);
+
+            var x1 = cx + cos * innerRadius;
+            var y1 = cy + sin * innerRadius;
+            var x2 = cx + cos * radius;
+            var y2 = cy + sin * radius;
+
+            var line = new System.Windows.Shapes.Line
+            {
+                X1 = x1,
+                Y1 = y1,
+                X2 = x2,
+                Y2 = y2,
+                Stroke = _barBrush,
+                StrokeThickness = thickness,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
+            BarsCanvas.Children.Add(line);
         }
     }
 
@@ -207,6 +272,13 @@ public partial class OverlayWindow : Window
         }
     }
 
+    public void ResetOffset()
+    {
+        _offset.X = 0.0;
+        _offset.Y = 0.0;
+        ConfirmPanel.Visibility = Visibility.Collapsed;
+    }
+
     private void BarsCanvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         _isDragging = true;
@@ -245,10 +317,7 @@ public partial class OverlayWindow : Window
         var s = await _settings.GetAsync();
         QuickBarsSlider.Value = s.BarsCount;
         QuickColorCycleEnabled.IsChecked = s.ColorCycleEnabled;
-        _quickColorOverride = s.Color;
-    
-        var preview = System.Windows.Media.Color.FromRgb(s.Color.R, s.Color.G, s.Color.B);
-        QuickColorButton.Background = new SolidColorBrush(preview);
+        SetQuickColor(s.Color);
 
         QuickSettingsPanel.Visibility = Visibility.Visible;
     }
@@ -260,7 +329,8 @@ public partial class OverlayWindow : Window
             s.BarsCount, s.Responsiveness, s.Smoothing, s.Color,
             s.TargetFps, s.ColorCycleEnabled, s.ColorCycleSpeedHz, s.BarCornerRadius,
             s.DisplayMode, s.SpecificMonitorDeviceName,
-            _offset.X, _offset.Y);
+            _offset.X, _offset.Y,
+            s.VisualizerMode, s.CircleDiameter);
         await _settings.SaveAsync(updated);
         ConfirmPanel.Visibility = Visibility.Collapsed;
     }
@@ -295,7 +365,9 @@ public partial class OverlayWindow : Window
                 s.DisplayMode,
                 s.SpecificMonitorDeviceName,
                 s.OffsetX,
-                s.OffsetY);
+                s.OffsetY,
+                s.VisualizerMode,
+                s.CircleDiameter);
 
             await _settings.SaveAsync(updated);
             QuickSettingsPanel.Visibility = Visibility.Collapsed;
@@ -311,26 +383,55 @@ public partial class OverlayWindow : Window
         QuickSettingsPanel.Visibility = Visibility.Collapsed;
     }
 
-    private void QuickColorButton_Click(object? sender, RoutedEventArgs e)
+    private void QuickEyedropperButton_Click(object? sender, RoutedEventArgs e)
     {
-        var current = _quickColorOverride;
-        using var dlg = new Forms.ColorDialog
+        var current = _quickColorOverride ?? new ColorRgb(0, 255, 128);
+        var picker = new ColorPickerWindow(current)
         {
-            AllowFullOpen = true,
-            AnyColor = true,
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(
-                current?.R ?? 0,
-                current?.G ?? 255,
-                current?.B ?? 128)
+            Owner = this
         };
-        if (dlg.ShowDialog() == Forms.DialogResult.OK)
+        if (picker.ShowDialog() == true)
         {
-            var rgb = new ColorRgb(dlg.Color.R, dlg.Color.G, dlg.Color.B);
-            _quickColorOverride = rgb;
-            var preview = System.Windows.Media.Color.FromRgb(rgb.R, rgb.G, rgb.B);
-            QuickColorButton.Background = new SolidColorBrush(preview);
+            SetQuickColor(picker.SelectedColor);
         }
+    }
+
+    private void QuickColorSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var rgb = new ColorRgb(
+            (byte)QuickColorR.Value,
+            (byte)QuickColorG.Value,
+            (byte)QuickColorB.Value);
+        ApplyQuickColor(rgb);
+    }
+
+    private void QuickColorPreview_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        var current = _quickColorOverride ?? new ColorRgb(0, 255, 128);
+        var picker = new ColorPickerWindow(current)
+        {
+            Owner = this
+        };
+        if (picker.ShowDialog() == true)
+        {
+            SetQuickColor(picker.SelectedColor);
+        }
+    }
+
+    private void SetQuickColor(ColorRgb rgb)
+    {
+        _quickColorOverride = rgb;
+        QuickColorR.Value = rgb.R;
+        QuickColorG.Value = rgb.G;
+        QuickColorB.Value = rgb.B;
+        ApplyQuickColor(rgb);
+    }
+
+    private void ApplyQuickColor(ColorRgb rgb)
+    {
+        _quickColorOverride = rgb;
+        var preview = System.Windows.Media.Color.FromRgb(rgb.R, rgb.G, rgb.B);
+        QuickColorPreview.Background = new SolidColorBrush(preview);
     }
 
     private static System.Windows.Media.Color LerpColor(System.Windows.Media.Color a, System.Windows.Media.Color b, float t)

@@ -38,6 +38,7 @@ public sealed class TrayIconHostedService : IHostedService
             var showItem = new Forms.ToolStripMenuItem("Show Overlay", null, async (_, __) => await _overlay.ShowAsync());
             var hideItem = new Forms.ToolStripMenuItem("Hide Overlay", null, async (_, __) => await _overlay.HideAsync());
             var toggleItem = new Forms.ToolStripMenuItem("Toggle Overlay", null, async (_, __) => await _overlay.ToggleAsync());
+            var resetPositionItem = new Forms.ToolStripMenuItem("Reset position", null, async (_, __) => await _overlay.ResetPositionAsync());
             var clickThroughItem = new Forms.ToolStripMenuItem("Click-through") { CheckOnClick = true, Checked = _overlay.ClickThrough };
             clickThroughItem.Click += async (_, __) =>
             {
@@ -73,6 +74,7 @@ public sealed class TrayIconHostedService : IHostedService
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(hideItem);
             contextMenu.Items.Add(toggleItem);
+            contextMenu.Items.Add(resetPositionItem);
             contextMenu.Items.Add(new Forms.ToolStripSeparator());
             contextMenu.Items.Add(clickThroughItem);
             contextMenu.Items.Add(alwaysOnTopItem);

@@ -77,12 +77,15 @@ public sealed class JsonSettingsRepository : ISettingsPort
         public string? SpecificMonitorDeviceName { get; set; }
         public double OffsetX { get; set; } = 0.0;
         public double OffsetY { get; set; } = 0.0;
+        public int VisualizerMode { get; set; } = 0; // VisualizerMode.Bars
+        public double CircleDiameter { get; set; } = 400.0;
 
         public EqualizerSettings ToDomain() => new EqualizerSettings(
             BarsCount, Responsiveness, Smoothing, new ColorRgb(ColorR, ColorG, ColorB),
             TargetFps, ColorCycleEnabled, ColorCycleSpeedHz, BarCornerRadius,
             (MonitorDisplayMode)DisplayMode, SpecificMonitorDeviceName,
-            OffsetX, OffsetY);
+            OffsetX, OffsetY,
+            (VisualizerMode)VisualizerMode, CircleDiameter);
 
         public static SettingsDto FromDomain(EqualizerSettings s) => new SettingsDto
         {
@@ -99,7 +102,9 @@ public sealed class JsonSettingsRepository : ISettingsPort
             DisplayMode = (int)s.DisplayMode,
             SpecificMonitorDeviceName = s.SpecificMonitorDeviceName,
             OffsetX = s.OffsetX,
-            OffsetY = s.OffsetY
+            OffsetY = s.OffsetY,
+            VisualizerMode = (int)s.VisualizerMode,
+            CircleDiameter = s.CircleDiameter
         };
     }
 }

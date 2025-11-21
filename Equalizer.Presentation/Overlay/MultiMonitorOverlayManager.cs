@@ -96,6 +96,26 @@ public sealed class MultiMonitorOverlayManager : IOverlayManager
 
     public Task ToggleAlwaysOnTopAsync() => SetAlwaysOnTopAsync(!_alwaysOnTop);
 
+    public async Task ResetPositionAsync()
+    {
+        var s = await _settings.GetAsync();
+        var updated = new EqualizerSettings(
+            s.BarsCount, s.Responsiveness, s.Smoothing, s.Color,
+            s.TargetFps, s.ColorCycleEnabled, s.ColorCycleSpeedHz, s.BarCornerRadius,
+            s.DisplayMode, s.SpecificMonitorDeviceName,
+            offsetX: 0.0, offsetY: 0.0,
+            s.VisualizerMode, s.CircleDiameter);
+        await _settings.SaveAsync(updated);
+
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            foreach (var win in _windows.Values)
+            {
+                win.ResetOffset();
+            }
+        });
+    }
+
     private void EnsureWindows(IEnumerable<Forms.Screen> targetScreens)
     {
         var screens = targetScreens;

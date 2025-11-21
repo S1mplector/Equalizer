@@ -14,4 +14,5 @@ public interface IOverlayManager
     Task ToggleClickThroughAsync();
     Task SetAlwaysOnTopAsync(bool value);
     Task ToggleAlwaysOnTopAsync();
+    Task ResetPositionAsync();
 }

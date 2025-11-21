@@ -27,9 +27,22 @@
                     <TextBlock Text="Bars" Width="80" VerticalAlignment="Center" Foreground="White"/>
                     <Slider x:Name="QuickBarsSlider" Minimum="8" Maximum="256" TickFrequency="8" IsSnapToTickEnabled="True" Width="140"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Color" Width="80" VerticalAlignment="Center" Foreground="White"/>
-                    <Button x:Name="QuickColorButton" Content="Pick..." Width="80"/>
+                <StackPanel Margin="0,4,0,4">
+                    <TextBlock Text="Color" Foreground="White" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <Border x:Name="QuickColorPreview" Height="20" CornerRadius="3" Background="#FF00FF80" Margin="0,0,0,4" MouseDown="QuickColorPreview_MouseDown"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <TextBlock Text="R" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorR" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <TextBlock Text="G" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorG" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="B" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorB" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <Button x:Name="QuickEyedropperButton" Content="Eyedropper" Width="100" HorizontalAlignment="Right"/>
                 </StackPanel>
                 <CheckBox x:Name="QuickColorCycleEnabled" Content="Cycle color" Foreground="White" Margin="0,0,0,4"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
