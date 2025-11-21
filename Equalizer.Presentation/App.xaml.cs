@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Equalizer.Application.DependencyInjection;
@@ -35,16 +36,24 @@ public partial class App : System.Windows.Application
             })
             .Build();
 
-        // Start host so hosted services (tray icon) run
-        _host.StartAsync().GetAwaiter().GetResult();
+        // Fire-and-forget async startup so we don't block the UI thread
+        _ = StartHostAndRestoreOverlayAsync();
+    }
+
+    private async Task StartHostAndRestoreOverlayAsync()
+    {
+        if (_host == null) return;
+
+        // Start host so hosted services (tray icon, hotkeys) run
+        await _host.StartAsync();
 
         // Restore overlay visibility from last session
         var settingsPort = _host.Services.GetRequiredService<ISettingsPort>();
         var overlay = _host.Services.GetRequiredService<IOverlayManager>();
-        var s = settingsPort.GetAsync().GetAwaiter().GetResult();
+        var s = await settingsPort.GetAsync();
         if (s.OverlayVisible)
         {
-            overlay.ShowAsync().GetAwaiter().GetResult();
+            await overlay.ShowAsync();
         }
     }
 
