@@ -143,12 +143,13 @@ public partial class OverlayWindow : Window
 
     private void RenderLinearBars(VisualizerFrame vf, float[] data, EqualizerSettings s, double width, double height, double spacing)
     {
+        var fade = Math.Clamp(vf.SilenceFade, 0f, 1f);
         var barWidth = Math.Max(1.0, (width - spacing * (data.Length - 1)) / data.Length);
         for (int i = 0; i < data.Length; i++)
         {
             // Slight bass/treble emphasis and beat pulse scaling
             var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
-            var h = Math.Max(1.0, data[i] * height * scale);
+            var h = Math.Max(1.0, data[i] * height * scale * fade);
             var left = i * (barWidth + spacing);
             var top = height - h;
             var rect = _bars[i];
@@ -160,10 +161,10 @@ public partial class OverlayWindow : Window
             Canvas.SetTop(rect, top);
 
             if (_peaks == null || _peaks.Length != data.Length) _peaks = new float[data.Length];
-            var amp = (float)Math.Clamp(data[i] * scale, 0.0, 1.0);
+            var amp = (float)Math.Clamp(data[i] * scale * fade, 0.0, 1.0);
             var decayed = _peaks[i] * 0.985f;
             _peaks[i] = Math.Max(decayed, amp);
-            var peakH = Math.Max(1.0, _peaks[i] * height);
+            var peakH = Math.Max(1.0, _peaks[i] * height * fade);
             var peakRect = _peakBars[i];
             peakRect.Width = barWidth;
             peakRect.Height = Math.Max(2.0, Math.Min(4.0, height * 0.01));
@@ -176,6 +177,9 @@ public partial class OverlayWindow : Window
     {
         BarsCanvas.Children.Clear();
         if (data.Length == 0) return;
+
+        var fade = Math.Clamp(vf.SilenceFade, 0f, 1f);
+        if (fade <= 0.001f) return;
 
         var cx = width / 2.0;
         var cy = height / 2.0;
@@ -195,7 +199,7 @@ public partial class OverlayWindow : Window
         for (int i = 0; i < data.Length; i++)
         {
             var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.1 * _beatPulse;
-            var amp = Math.Clamp(data[i] * scale, 0.0, 1.0);
+            var amp = Math.Clamp(data[i] * scale * fade, 0.0, 1.0);
             var radius = innerRadius + (outerRadius - innerRadius) * amp;
 
             var angle = 2.0 * Math.PI * i / data.Length;
@@ -330,7 +334,9 @@ public partial class OverlayWindow : Window
             s.TargetFps, s.ColorCycleEnabled, s.ColorCycleSpeedHz, s.BarCornerRadius,
             s.DisplayMode, s.SpecificMonitorDeviceName,
             _offset.X, _offset.Y,
-            s.VisualizerMode, s.CircleDiameter, s.OverlayVisible);
+            s.VisualizerMode, s.CircleDiameter,
+            s.OverlayVisible, s.FadeOnSilenceEnabled,
+            s.SilenceFadeOutSeconds, s.SilenceFadeInSeconds);
         await _settings.SaveAsync(updated);
         ConfirmPanel.Visibility = Visibility.Collapsed;
     }
@@ -368,7 +374,10 @@ public partial class OverlayWindow : Window
                 s.OffsetY,
                 s.VisualizerMode,
                 s.CircleDiameter,
-                s.OverlayVisible);
+                s.OverlayVisible,
+                s.FadeOnSilenceEnabled,
+                s.SilenceFadeOutSeconds,
+                s.SilenceFadeInSeconds);
 
             await _settings.SaveAsync(updated);
             QuickSettingsPanel.Visibility = Visibility.Collapsed;

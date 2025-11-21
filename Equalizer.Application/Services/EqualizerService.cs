@@ -22,6 +22,7 @@ public sealed class EqualizerService : IEqualizerService
     private Task<VisualizerFrame>? _inFlight;
     private VisualizerFrame? _lastFrameCache;
     private DateTime _lastFrameAt;
+    private double _silenceFade = 1.0; // 1=fully visible, 0=fully faded
 
     public EqualizerService(IAudioInputPort audio, ISettingsPort settings, SpectrumProcessor processor)
     {
@@ -93,14 +94,24 @@ public sealed class EqualizerService : IEqualizerService
         var samps = audioFrame.Samples;
         for (int i = 0; i < samps.Length; i++) { double v = samps[i]; rms += v * v; }
         rms = samps.Length > 0 ? Math.Sqrt(rms / samps.Length) : 0;
-        bool isSilent = rms < 2e-4; // tuned threshold for normalized float audio
+        bool isSilent = rms < 1e-3; // treat very low-level noise as silence for fading purposes
 
         double[] mag;
         float[] rawBars;
         if (isSilent)
         {
             mag = _prevMag is { Length: > 0 } ? new double[_prevMag.Length] : Array.Empty<double>();
-            rawBars = new float[settings.BarsCount];
+
+            if (settings.FadeOnSilenceEnabled && _previous != null && _previous.Length == settings.BarsCount)
+            {
+                // Keep the last visible shape and let SilenceFade drive the visual fade-out
+                rawBars = (float[])_previous.Clone();
+            }
+            else
+            {
+                // Legacy behaviour: decay to zero using smoothing
+                rawBars = new float[settings.BarsCount];
+            }
         }
         else
         {
@@ -114,7 +125,11 @@ public sealed class EqualizerService : IEqualizerService
 
         var output = new float[rawBars.Length];
         var smoothing = Math.Clamp(settings.Smoothing, 0.0, 1.0);
-        if (isSilent) smoothing = Math.Min(smoothing, 0.2); // faster decay on silence
+        if (isSilent && !settings.FadeOnSilenceEnabled)
+        {
+            // When not using explicit fade, still decay bars a bit faster on silence
+            smoothing = Math.Min(smoothing, 0.2);
+        }
         var responsiveness = Math.Clamp(settings.Responsiveness, 0.0, 1.0);
         for (int i = 0; i < rawBars.Length; i++)
         {
@@ -174,7 +189,30 @@ public sealed class EqualizerService : IEqualizerService
         bool isBeatFlag = !isSilent && flux > threshold && flux > 1e-6;
         float beatStrength = isBeatFlag ? (float)Math.Clamp((flux - threshold) / Math.Max(threshold, 1e-6), 0.0, 1.0) : 0f;
 
-        return new VisualizerFrame(output, bass, mid, treble, isBeatFlag, beatStrength);
+        // Smooth global fade factor for silence-based fading
+        float silenceFadeValue = 1f;
+        if (settings.FadeOnSilenceEnabled)
+        {
+            double targetFps = Math.Clamp(settings.TargetFps, 10, 240);
+            double frameDt = 1.0 / targetFps;
+            double fadeOutSeconds = Math.Clamp(settings.SilenceFadeOutSeconds, 0.05, 10.0);
+            double fadeInSeconds = Math.Clamp(settings.SilenceFadeInSeconds, 0.05, 10.0);
+            double fadeOutPerFrame = frameDt / fadeOutSeconds;
+            double fadeInPerFrame = frameDt / fadeInSeconds;
+
+            if (isSilent)
+            {
+                _silenceFade = Math.Max(0.0, _silenceFade - fadeOutPerFrame);
+            }
+            else
+            {
+                _silenceFade = Math.Min(1.0, _silenceFade + fadeInPerFrame);
+            }
+
+            silenceFadeValue = (float)_silenceFade;
+        }
+
+        return new VisualizerFrame(output, bass, mid, treble, isBeatFlag, beatStrength, silenceFadeValue);
         }
         finally
         {

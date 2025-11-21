@@ -80,13 +80,17 @@ public sealed class JsonSettingsRepository : ISettingsPort
         public int VisualizerMode { get; set; } = 0; // VisualizerMode.Bars
         public double CircleDiameter { get; set; } = 400.0;
         public bool OverlayVisible { get; set; } = true;
+        public bool FadeOnSilenceEnabled { get; set; } = false;
+        public double SilenceFadeOutSeconds { get; set; } = 0.5;
+        public double SilenceFadeInSeconds { get; set; } = 0.2;
 
         public EqualizerSettings ToDomain() => new EqualizerSettings(
             BarsCount, Responsiveness, Smoothing, new ColorRgb(ColorR, ColorG, ColorB),
             TargetFps, ColorCycleEnabled, ColorCycleSpeedHz, BarCornerRadius,
             (MonitorDisplayMode)DisplayMode, SpecificMonitorDeviceName,
             OffsetX, OffsetY,
-            (VisualizerMode)VisualizerMode, CircleDiameter, OverlayVisible);
+            (VisualizerMode)VisualizerMode, CircleDiameter, OverlayVisible, FadeOnSilenceEnabled,
+            SilenceFadeOutSeconds, SilenceFadeInSeconds);
 
         public static SettingsDto FromDomain(EqualizerSettings s) => new SettingsDto
         {
@@ -106,7 +110,10 @@ public sealed class JsonSettingsRepository : ISettingsPort
             OffsetY = s.OffsetY,
             VisualizerMode = (int)s.VisualizerMode,
             CircleDiameter = s.CircleDiameter,
-            OverlayVisible = s.OverlayVisible
+            OverlayVisible = s.OverlayVisible,
+            FadeOnSilenceEnabled = s.FadeOnSilenceEnabled,
+            SilenceFadeOutSeconds = s.SilenceFadeOutSeconds,
+            SilenceFadeInSeconds = s.SilenceFadeInSeconds
         };
     }
 }

@@ -17,6 +17,9 @@ public sealed class EqualizerSettings
     public VisualizerMode VisualizerMode { get; }
     public double CircleDiameter { get; }
     public bool OverlayVisible { get; }
+    public bool FadeOnSilenceEnabled { get; }
+    public double SilenceFadeOutSeconds { get; }
+    public double SilenceFadeInSeconds { get; }
 
     public EqualizerSettings(int barsCount, double responsiveness, double smoothing, ColorRgb color)
         : this(barsCount, responsiveness, smoothing, color,
@@ -80,16 +83,39 @@ public sealed class EqualizerSettings
             targetFps, colorCycleEnabled, colorCycleSpeedHz, barCornerRadius,
             displayMode, specificMonitorDeviceName,
             offsetX, offsetY,
-            visualizerMode, circleDiameter, overlayVisible: true)
+            visualizerMode, circleDiameter,
+            overlayVisible: true,
+            fadeOnSilenceEnabled: false,
+            silenceFadeOutSeconds: 0.5,
+            silenceFadeInSeconds: 0.2)
     {
     }
 
-    // Full constructor including offsets, visualizer configuration, and overlay visibility
+    // Full constructor including offsets, visualizer configuration, overlay visibility and fade-on-silence flag
     public EqualizerSettings(int barsCount, double responsiveness, double smoothing, ColorRgb color,
         int targetFps, bool colorCycleEnabled, double colorCycleSpeedHz, double barCornerRadius,
         MonitorDisplayMode displayMode, string? specificMonitorDeviceName,
         double offsetX, double offsetY,
-        VisualizerMode visualizerMode, double circleDiameter, bool overlayVisible)
+        VisualizerMode visualizerMode, double circleDiameter, bool overlayVisible, bool fadeOnSilenceEnabled)
+        : this(barsCount, responsiveness, smoothing, color,
+            targetFps, colorCycleEnabled, colorCycleSpeedHz, barCornerRadius,
+            displayMode, specificMonitorDeviceName,
+            offsetX, offsetY,
+            visualizerMode, circleDiameter,
+            overlayVisible, fadeOnSilenceEnabled,
+            silenceFadeOutSeconds: 0.5,
+            silenceFadeInSeconds: 0.2)
+    {
+    }
+
+    // Most complete constructor including fade-on-silence timings
+    public EqualizerSettings(int barsCount, double responsiveness, double smoothing, ColorRgb color,
+        int targetFps, bool colorCycleEnabled, double colorCycleSpeedHz, double barCornerRadius,
+        MonitorDisplayMode displayMode, string? specificMonitorDeviceName,
+        double offsetX, double offsetY,
+        VisualizerMode visualizerMode, double circleDiameter,
+        bool overlayVisible, bool fadeOnSilenceEnabled,
+        double silenceFadeOutSeconds, double silenceFadeInSeconds)
     {
         if (barsCount < 8 || barsCount > 256)
             throw new ArgumentOutOfRangeException(nameof(barsCount), "BarsCount must be between 8 and 256.");
@@ -105,6 +131,10 @@ public sealed class EqualizerSettings
             throw new ArgumentOutOfRangeException(nameof(barCornerRadius), "BarCornerRadius must be between 0 and 16.");
         if (circleDiameter < 50 || circleDiameter > 5000)
             throw new ArgumentOutOfRangeException(nameof(circleDiameter), "CircleDiameter must be between 50 and 5000.");
+        if (silenceFadeOutSeconds < 0.05 || silenceFadeOutSeconds > 10)
+            throw new ArgumentOutOfRangeException(nameof(silenceFadeOutSeconds), "SilenceFadeOutSeconds must be between 0.05 and 10 seconds.");
+        if (silenceFadeInSeconds < 0.05 || silenceFadeInSeconds > 10)
+            throw new ArgumentOutOfRangeException(nameof(silenceFadeInSeconds), "SilenceFadeInSeconds must be between 0.05 and 10 seconds.");
 
         BarsCount = barsCount;
         Responsiveness = responsiveness;
@@ -121,6 +151,9 @@ public sealed class EqualizerSettings
         VisualizerMode = visualizerMode;
         CircleDiameter = circleDiameter;
         OverlayVisible = overlayVisible;
+        FadeOnSilenceEnabled = fadeOnSilenceEnabled;
+        SilenceFadeOutSeconds = silenceFadeOutSeconds;
+        SilenceFadeInSeconds = silenceFadeInSeconds;
     }
 
     public static EqualizerSettings Default => new(
@@ -138,6 +171,9 @@ public sealed class EqualizerSettings
         offsetY: 0.0,
         visualizerMode: VisualizerMode.Bars,
         circleDiameter: 400.0,
-        overlayVisible: true
+        overlayVisible: true,
+        fadeOnSilenceEnabled: false,
+        silenceFadeOutSeconds: 0.5,
+        silenceFadeInSeconds: 0.2
     );
 }

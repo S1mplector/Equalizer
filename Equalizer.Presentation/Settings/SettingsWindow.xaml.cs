@@ -34,6 +34,8 @@ public partial class SettingsWindow : Window
         DisplayModeCombo.SelectionChanged += OnDisplayModeChanged;
         PickColorButton.Click += OnPickColor;
         ProfileCombo.SelectionChanged += OnProfileChanged;
+        FadeOutSlider.ValueChanged += (_, __) => FadeOutValue.Text = FadeOutSlider.Value.ToString("0.00");
+        FadeInSlider.ValueChanged += (_, __) => FadeInValue.Text = FadeInSlider.Value.ToString("0.00");
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -94,6 +96,15 @@ public partial class SettingsWindow : Window
         CircleDiameterSlider.Value = s.CircleDiameter;
         CircleDiameterValue.Text = s.CircleDiameter.ToString("0");
 
+        // Fade on silence
+        FadeOnSilenceEnabledCheckBox.IsChecked = s.FadeOnSilenceEnabled;
+
+        // Fade timings
+        FadeOutSlider.Value = s.SilenceFadeOutSeconds;
+        FadeOutValue.Text = s.SilenceFadeOutSeconds.ToString("0.00");
+        FadeInSlider.Value = s.SilenceFadeInSeconds;
+        FadeInValue.Text = s.SilenceFadeInSeconds.ToString("0.00");
+
         // Performance profile (infer from current values)
         SetProfileFromCurrentValues();
     }
@@ -118,6 +129,9 @@ public partial class SettingsWindow : Window
             var displayMode = GetSelectedDisplayMode();
             var visualizerMode = GetSelectedVisualizerMode();
             double circleDiameter = CircleDiameterSlider.Value;
+            bool fadeOnSilence = FadeOnSilenceEnabledCheckBox.IsChecked == true;
+            double fadeOutSeconds = FadeOutSlider.Value;
+            double fadeInSeconds = FadeInSlider.Value;
             string? deviceName = null;
             if (displayMode == MonitorDisplayMode.Specific && MonitorCombo.SelectedItem is ComboBoxItem sel)
                 deviceName = sel.Tag as string;
@@ -129,7 +143,8 @@ public partial class SettingsWindow : Window
                 displayMode, deviceName,
                 current.OffsetX, current.OffsetY,
                 visualizerMode, circleDiameter,
-                current.OverlayVisible);
+                current.OverlayVisible, fadeOnSilence,
+                fadeOutSeconds, fadeInSeconds);
             await _settings.SaveAsync(s);
 
             // Immediately reflect changes in overlays

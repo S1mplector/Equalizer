@@ -25,6 +25,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -100,6 +102,17 @@
             <ComboBoxItem Content="Balanced" Tag="balanced" />
             <ComboBoxItem Content="Low latency" Tag="low" />
         </ComboBox>
+
+        <TextBlock Grid.Row="13" Grid.Column="0" Text="Fade on silence" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <CheckBox x:Name="FadeOnSilenceEnabledCheckBox" Grid.Row="13" Grid.Column="1" VerticalAlignment="Center" Margin="0,8,0,0" Content="Enable"/>
+
+        <TextBlock Grid.Row="14" Grid.Column="0" Text="Fade-out time (s)" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <Slider x:Name="FadeOutSlider" Grid.Row="14" Grid.Column="1" Minimum="0.1" Maximum="5" TickFrequency="0.1" Margin="0,8,0,0"/>
+        <TextBox x:Name="FadeOutValue" Grid.Row="14" Grid.Column="2" Margin="8,8,0,0"/>
+
+        <TextBlock Grid.Row="15" Grid.Column="0" Text="Fade-in time (s)" VerticalAlignment="Center" Margin="0,8,8,0"/>
+        <Slider x:Name="FadeInSlider" Grid.Row="15" Grid.Column="1" Minimum="0.1" Maximum="5" TickFrequency="0.1" Margin="0,8,0,0"/>
+        <TextBox x:Name="FadeInValue" Grid.Row="15" Grid.Column="2" Margin="8,8,0,0"/>
 
         </Grid>
         </ScrollViewer>

@@ -8,8 +8,9 @@ public sealed class VisualizerFrame
     public float Treble { get; }
     public bool IsBeat { get; }
     public float BeatStrength { get; }
+    public float SilenceFade { get; }
 
-    public VisualizerFrame(float[] bars, float bass, float mid, float treble, bool isBeat, float beatStrength)
+    public VisualizerFrame(float[] bars, float bass, float mid, float treble, bool isBeat, float beatStrength, float silenceFade)
     {
         Bars = bars;
         Bass = bass;
@@ -17,5 +18,6 @@ public sealed class VisualizerFrame
         Treble = treble;
         IsBeat = isBeat;
         BeatStrength = beatStrength;
+        SilenceFade = silenceFade;
     }
 }

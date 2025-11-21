@@ -107,7 +107,8 @@ public sealed class MultiMonitorOverlayManager : IOverlayManager
             s.DisplayMode, s.SpecificMonitorDeviceName,
             offsetX: 0.0, offsetY: 0.0,
             s.VisualizerMode, s.CircleDiameter,
-            s.OverlayVisible);
+            s.OverlayVisible, s.FadeOnSilenceEnabled,
+            s.SilenceFadeOutSeconds, s.SilenceFadeInSeconds);
         await _settings.SaveAsync(updated);
 
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
@@ -128,7 +129,10 @@ public sealed class MultiMonitorOverlayManager : IOverlayManager
             s.DisplayMode, s.SpecificMonitorDeviceName,
             s.OffsetX, s.OffsetY,
             s.VisualizerMode, s.CircleDiameter,
-            overlayVisible: visible);
+            overlayVisible: visible,
+            fadeOnSilenceEnabled: s.FadeOnSilenceEnabled,
+            silenceFadeOutSeconds: s.SilenceFadeOutSeconds,
+            silenceFadeInSeconds: s.SilenceFadeInSeconds);
         await _settings.SaveAsync(updated);
     }
 
