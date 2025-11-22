@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Equalizer.Application.Abstractions;
@@ -13,11 +12,14 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
 {
     private readonly WasapiLoopbackCapture _capture;
     private readonly object _lock = new();
-    private readonly Queue<float> _queue = new();
-    private readonly SemaphoreSlim _dataAvailable = new(0);
+    private readonly SemaphoreSlim _dataAvailable = new(0, int.MaxValue);
     private bool _disposed;
     private readonly int _maxQueueSamples;
     private float[]? _prevFrame;
+    private readonly float[] _buffer;
+    private int _writeIndex;
+    private int _readIndex;
+    private int _availableSamples;
 
     public int SampleRate { get; }
     public int Channels { get; }
@@ -30,6 +32,7 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
         SampleRate = _capture.WaveFormat.SampleRate;
         Channels = _capture.WaveFormat.Channels;
         _maxQueueSamples = Math.Max(SampleRate / 16, 2048); // keep ~60ms of mono samples max to reduce latency
+        _buffer = new float[_maxQueueSamples * 2]; // small headroom to avoid drop chatter
         _capture.DataAvailable += OnDataAvailable;
         _capture.RecordingStopped += (_, __) => _dataAvailable.Release();
         _capture.StartRecording();
@@ -54,9 +57,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                     {
                         for (int i = 0; i < sampleCount; i++)
                         {
-                            _queue.Enqueue(wb.FloatBuffer[i]);
+                            Enqueue_NoLock(wb.FloatBuffer[i]);
                         }
-                        TrimQueue_NoLock();
                         enqueued = sampleCount > 0;
                     }
                 }
@@ -71,9 +73,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                             double sum = 0;
                             for (int c = 0; c < channels; c++)
                                 sum += wb.FloatBuffer[idx++];
-                            _queue.Enqueue((float)(sum / channels));
+                            Enqueue_NoLock((float)(sum / channels));
                         }
-                        TrimQueue_NoLock();
                         enqueued = frames > 0;
                     }
                 }
@@ -88,8 +89,7 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                     lock (_lock)
                     {
                         for (int i = 0; i < sampleCount; i++)
-                            _queue.Enqueue(shorts[i] / 32768f);
-                        TrimQueue_NoLock();
+                            Enqueue_NoLock(shorts[i] / 32768f);
                         enqueued = sampleCount > 0;
                     }
                 }
@@ -104,9 +104,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                             int sum = 0;
                             for (int c = 0; c < channels; c++)
                                 sum += shorts[idx++];
-                            _queue.Enqueue(sum / (32768f * channels));
+                            Enqueue_NoLock(sum / (32768f * channels));
                         }
-                        TrimQueue_NoLock();
                         enqueued = frames > 0;
                     }
                 }
@@ -128,9 +127,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                             int b2 = e.Buffer[idx++];
                             int val = (b0 | (b1 << 8) | (b2 << 16));
                             if ((val & 0x800000) != 0) val |= unchecked((int)0xFF000000); // sign extend
-                            _queue.Enqueue(val / 8388608f);
+                            Enqueue_NoLock(val / 8388608f);
                         }
-                        TrimQueue_NoLock();
                         enqueued = sampleCount > 0;
                     }
                 }
@@ -152,9 +150,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                                 if ((val & 0x800000) != 0) val |= unchecked((int)0xFF000000);
                                 sum += val;
                             }
-                            _queue.Enqueue((float)(sum / (channels * 8388608.0)));
+                            Enqueue_NoLock((float)(sum / (channels * 8388608.0)));
                         }
-                        TrimQueue_NoLock();
                         enqueued = frames > 0;
                     }
                 }
@@ -170,8 +167,7 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                     lock (_lock)
                     {
                         for (int i = 0; i < sampleCount; i++)
-                            _queue.Enqueue(ints[i] / 2147483648f);
-                        TrimQueue_NoLock();
+                            Enqueue_NoLock(ints[i] / 2147483648f);
                         enqueued = sampleCount > 0;
                     }
                 }
@@ -186,9 +182,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
                             long sum = 0;
                             for (int c = 0; c < channels; c++)
                                 sum += ints[idx++];
-                            _queue.Enqueue((float)(sum / (channels * 2147483648.0)));
+                            Enqueue_NoLock((float)(sum / (channels * 2147483648.0)));
                         }
-                        TrimQueue_NoLock();
                         enqueued = frames > 0;
                     }
                 }
@@ -206,14 +201,6 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
         }
     }
 
-    // Must be called inside _lock
-    private void TrimQueue_NoLock()
-    {
-        int max = _maxQueueSamples;
-        while (_queue.Count > max)
-            _queue.Dequeue();
-    }
-
     public async Task<AudioFrame> ReadFrameAsync(int minSamples, CancellationToken cancellationToken)
     {
         if (minSamples <= 0) minSamples = 2048;
@@ -228,12 +215,11 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
             bool haveEnough;
             lock (_lock)
             {
-                haveEnough = _queue.Count >= need;
+                haveEnough = _availableSamples >= need;
             }
             if (!haveEnough)
             {
-                // Poll for new audio more frequently to reduce end-to-end latency
-                await _dataAvailable.WaitAsync(TimeSpan.FromMilliseconds(5), cancellationToken);
+                await _dataAvailable.WaitAsync(cancellationToken);
                 continue;
             }
 
@@ -249,15 +235,56 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
             int toDequeue = _prevFrame == null ? minSamples : hop;
             lock (_lock)
             {
-                for (int i = 0; i < toDequeue; i++)
-                {
-                    frame[copied++] = _queue.Dequeue();
-                }
+                copied += DequeueSamples_NoLock(frame, copied, toDequeue);
             }
 
             _prevFrame = frame;
             return new AudioFrame(frame, SampleRate);
         }
+    }
+
+    // Must be called inside _lock
+    private void Enqueue_NoLock(float value)
+    {
+        _buffer[_writeIndex] = value;
+        _writeIndex = (_writeIndex + 1) % _buffer.Length;
+
+        if (_availableSamples == _buffer.Length)
+        {
+            // Overwrite oldest when buffer is full
+            _readIndex = (_readIndex + 1) % _buffer.Length;
+        }
+        else
+        {
+            _availableSamples++;
+        }
+
+        // Soft cap to keep latency bounded
+        if (_availableSamples > _maxQueueSamples)
+        {
+            int toDrop = _availableSamples - _maxQueueSamples;
+            _readIndex = (_readIndex + toDrop) % _buffer.Length;
+            _availableSamples = _maxQueueSamples;
+        }
+    }
+
+    // Must be called inside _lock
+    private int DequeueSamples_NoLock(float[] dest, int destOffset, int count)
+    {
+        int remaining = Math.Min(count, _availableSamples);
+        int copied = 0;
+        int cap = _buffer.Length;
+
+        while (copied < remaining)
+        {
+            int chunk = Math.Min(remaining - copied, cap - _readIndex);
+            Array.Copy(_buffer, _readIndex, dest, destOffset + copied, chunk);
+            _readIndex = (_readIndex + chunk) % cap;
+            copied += chunk;
+        }
+
+        _availableSamples -= copied;
+        return copied;
     }
 
     public void Dispose()
