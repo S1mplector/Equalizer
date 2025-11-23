@@ -17,17 +17,13 @@ public partial class OverlayWindow : Window
 {
     private readonly IEqualizerService _service;
     private readonly ISettingsPort _settings;
-    private readonly List<System.Windows.Shapes.Rectangle> _bars = new();
-    private readonly List<System.Windows.Shapes.Rectangle> _peakBars = new();
-    private readonly List<System.Windows.Shapes.Rectangle> _glowBars = new();
     private readonly CancellationTokenSource _cts = new();
     private bool _rendering;
     private SolidColorBrush _barBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 128));
     private DateTime _lastFrame = DateTime.MinValue;
     private double _cyclePhase;
     private double _beatPulse;
-    private Task<VisualizerFrame>? _pendingFrameTask;
-    private VisualizerFrame? _lastFrameData;
+    private VisualizerFrame? _latestFrame;
     private float[]? _peaks;
     private SolidColorBrush _peakBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 255, 255));
     private readonly TranslateTransform _offset = new TranslateTransform();
@@ -35,22 +31,25 @@ public partial class OverlayWindow : Window
     private System.Windows.Point _dragStartPoint;
     private System.Windows.Point _startOffset;
     private ColorRgb? _quickColorOverride;
-    private readonly List<System.Windows.Shapes.Line> _circleLines = new();
-    private readonly List<System.Windows.Shapes.Line> _circleGlowLines = new();
-    private VisualizerMode? _lastMode;
-    private int _lastBarCount = -1;
     private readonly object _settingsCacheLock = new();
     private EqualizerSettings? _settingsSnapshot;
     private DateTime _settingsSnapshotAt;
     private Task<EqualizerSettings>? _settingsFetchTask;
     private double _lastMeasuredFps;
     private DateTime _lastFpsSampleAt = DateTime.MinValue;
+    private readonly DrawingGroup _drawingGroup = new();
+    private readonly DrawingImage _drawingImage;
+    private readonly Image _barsImage = new() { Stretch = Stretch.Fill, SnapsToDevicePixels = true, IsHitTestVisible = false };
+    private Task? _framePumpTask;
 
     public OverlayWindow(IEqualizerService service, ISettingsPort settings)
     {
         _service = service;
         _settings = settings;
+        _drawingImage = new DrawingImage(_drawingGroup);
         InitializeComponent();
+        _barsImage.Source = _drawingImage;
+        BarsCanvas.Children.Add(_barsImage);
 
         Loaded += (_, __) => { System.Windows.Media.CompositionTarget.Rendering += OnRendering; };
         Unloaded += (_, __) => { System.Windows.Media.CompositionTarget.Rendering -= OnRendering; };
@@ -69,6 +68,7 @@ public partial class OverlayWindow : Window
         QuickColorG.ValueChanged += QuickColorSlider_ValueChanged;
         QuickColorB.ValueChanged += QuickColorSlider_ValueChanged;
         QuickEyedropperButton.Click += QuickEyedropperButton_Click;
+        _framePumpTask = RunFramePumpAsync();
         _ = ApplyInitialOffsetAsync();
     }
 
@@ -77,6 +77,33 @@ public partial class OverlayWindow : Window
         var s = await _settings.GetAsync();
         _offset.X = s.OffsetX;
         _offset.Y = s.OffsetY;
+    }
+
+    private async Task RunFramePumpAsync()
+    {
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                var frame = await _service.GetVisualizerFrameAsync(_cts.Token);
+                Interlocked.Exchange(ref _latestFrame, frame);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                try
+                {
+                    await Task.Delay(25, _cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }
     }
 
     private void OnRendering(object? sender, EventArgs e)
@@ -114,16 +141,7 @@ public partial class OverlayWindow : Window
 
             var frameStart = DateTime.UtcNow;
 
-            if (_pendingFrameTask == null || _pendingFrameTask.IsCompleted)
-            {
-                _pendingFrameTask = _service.GetVisualizerFrameAsync(_cts.Token);
-            }
-            if (_pendingFrameTask != null && _pendingFrameTask.IsCompletedSuccessfully)
-            {
-                _lastFrameData = _pendingFrameTask.Result;
-            }
-
-            var vf = _lastFrameData;
+            var vf = Volatile.Read(ref _latestFrame);
             if (vf == null) return;
             var data = vf.Bars;
 
@@ -136,14 +154,17 @@ public partial class OverlayWindow : Window
             var color = s.Color;
             if (s.ColorCycleEnabled)
             {
-                _cyclePhase += s.ColorCycleSpeedHz * (minIntervalMs / 1000.0) * 360.0;
+                double dtSec = dt > 0.0 ? dt / 1000.0 : (minIntervalMs / 1000.0);
+                _cyclePhase += s.ColorCycleSpeedHz * dtSec * 360.0;
                 _cyclePhase %= 360.0;
                 var rgb = HsvToRgb(_cyclePhase, 1.0, 1.0);
                 color = new ColorRgb((byte)rgb.r, (byte)rgb.g, (byte)rgb.b);
             }
             // Beat pulse
+            double beatDt = dt > 0.0 ? dt / 1000.0 : (minIntervalMs / 1000.0);
+            double beatDecay = Math.Exp(-beatDt / 0.18); // time constant ~180ms
+            _beatPulse *= beatDecay;
             if (vf.IsBeat) _beatPulse = Math.Min(1.0, _beatPulse + vf.BeatStrength * 1.2);
-            _beatPulse *= 0.94; // slightly slower decay for a more visible pulse
 
             var baseColor = System.Windows.Media.Color.FromRgb(color.R, color.G, color.B);
             var pulsed = LerpColor(baseColor, System.Windows.Media.Colors.White, (float)(0.35 * _beatPulse));
@@ -151,30 +172,10 @@ public partial class OverlayWindow : Window
 
             if (s.VisualizerMode == VisualizerMode.Circular)
             {
-                if (_lastMode != VisualizerMode.Circular || _circleLines.Count != data.Length)
-                {
-                    ClearAllShapes();
-                    EnsureCircularLines(data.Length, s.GlowEnabled);
-                    _lastMode = VisualizerMode.Circular;
-                    _lastBarCount = data.Length;
-                }
-                else if (_lastBarCount != data.Length)
-                {
-                    EnsureCircularLines(data.Length, s.GlowEnabled);
-                    _lastBarCount = data.Length;
-                }
                 RenderCircular(vf, data, s, width, height);
             }
             else
             {
-                if (_lastMode != VisualizerMode.Bars)
-                {
-                    ClearAllShapes();
-                    _lastMode = VisualizerMode.Bars;
-                    _lastBarCount = -1;
-                }
-                EnsureBars(data.Length);
-                _lastBarCount = data.Length;
                 RenderLinearBars(vf, data, s, width, height, spacing);
             }
 
@@ -199,8 +200,17 @@ public partial class OverlayWindow : Window
 
     private void RenderLinearBars(VisualizerFrame vf, float[] data, EqualizerSettings s, double width, double height, double spacing)
     {
+        if (data.Length == 0 || width <= 0 || height <= 0)
+        {
+            ClearDrawing();
+            return;
+        }
+
         var fade = Math.Clamp(vf.SilenceFade, 0f, 1f);
         var barWidth = Math.Max(1.0, (width - spacing * (data.Length - 1)) / data.Length);
+        if (_peaks == null || _peaks.Length != data.Length) _peaks = new float[data.Length];
+
+        using var dc = _drawingGroup.Open();
         for (int i = 0; i < data.Length; i++)
         {
             // Slight bass/treble emphasis and stronger beat pulse scaling
@@ -228,52 +238,44 @@ public partial class OverlayWindow : Window
             var w = barWidth * widthScale;
             var left = i * (barWidth + spacing) + (barWidth - w) * 0.5;
             var top = height - h;
-            var rect = _bars[i];
-            rect.Width = w;
-            rect.Height = h;
-            rect.RadiusX = s.BarCornerRadius;
-            rect.RadiusY = s.BarCornerRadius;
-            Canvas.SetLeft(rect, left);
-            Canvas.SetTop(rect, top);
 
-            // Optional glow bar behind the main bar
-            if (_glowBars.Count == data.Length)
+            if (s.GlowEnabled)
             {
-                var glowRect = _glowBars[i];
-                if (s.GlowEnabled)
-                {
-                    glowRect.Opacity = 0.35;
-                    glowRect.Width = w * 1.15;
-                    var glowH = Math.Max(1.0, h * 1.25);
-                    glowRect.Height = glowH;
-                    Canvas.SetLeft(glowRect, left - (glowRect.Width - w) * 0.5);
-                    Canvas.SetTop(glowRect, Math.Max(0.0, height - glowH));
-                }
-                else
-                {
-                    glowRect.Opacity = 0.0;
-                }
+                double glowH = Math.Max(1.0, h * 1.25);
+                double glowW = w * 1.15;
+                var glowRect = new Rect(left - (glowW - w) * 0.5, Math.Max(0.0, height - glowH), glowW, glowH);
+                dc.PushOpacity(0.35);
+                dc.DrawRoundedRectangle(_barBrush, null, glowRect, s.BarCornerRadius, s.BarCornerRadius);
+                dc.Pop();
             }
 
-            if (_peaks == null || _peaks.Length != data.Length) _peaks = new float[data.Length];
+            var barRect = new Rect(left, top, w, h);
+            dc.DrawRoundedRectangle(_barBrush, null, barRect, s.BarCornerRadius, s.BarCornerRadius);
+
             var amp = (float)Math.Clamp(data[i] * scale * fade, 0.0, 1.0);
             var decayed = _peaks[i] * 0.985f;
             _peaks[i] = Math.Max(decayed, amp);
             var peakH = Math.Max(1.0, _peaks[i] * height * fade);
-            var peakRect = _peakBars[i];
-            peakRect.Width = w;
-            peakRect.Height = Math.Max(2.0, Math.Min(4.0, height * 0.01));
-            Canvas.SetLeft(peakRect, left);
-            Canvas.SetTop(peakRect, Math.Max(0.0, height - peakH - peakRect.Height));
+            var peakHeight = Math.Max(2.0, Math.Min(4.0, height * 0.01));
+            var peakRect = new Rect(left, Math.Max(0.0, height - peakH - peakHeight), w, peakHeight);
+            dc.DrawRectangle(_peakBrush, null, peakRect);
         }
     }
 
     private void RenderCircular(VisualizerFrame vf, float[] data, EqualizerSettings s, double width, double height)
     {
-        if (data.Length == 0) return;
+        if (data.Length == 0 || width <= 0 || height <= 0)
+        {
+            ClearDrawing();
+            return;
+        }
 
         var fade = Math.Clamp(vf.SilenceFade, 0f, 1f);
-        if (fade <= 0.001f) return;
+        if (fade <= 0.001f)
+        {
+            ClearDrawing();
+            return;
+        }
 
         var cx = width / 2.0;
         var cy = height / 2.0;
@@ -290,6 +292,7 @@ public partial class OverlayWindow : Window
         var thickness = arcPerBar * 0.55;        // use ~55% of available arc to leave visible gaps
         thickness = Math.Clamp(thickness, 1.5, targetRadius * 0.15);
 
+        using var dc = _drawingGroup.Open();
         for (int i = 0; i < data.Length; i++)
         {
             var scale = 1.0 + 0.12 * vf.Bass + 0.06 * vf.Treble + 0.18 * _beatPulse;
@@ -319,141 +322,25 @@ public partial class OverlayWindow : Window
                 localThickness = thickness * (1.0 + 0.5 * beatFactor * (0.5 + 0.5 * regionWeight));
             }
 
-            // Optional glow: a thicker, low-opacity line behind the main bar
-            if (s.GlowEnabled && _circleGlowLines.Count == data.Length)
+            if (s.GlowEnabled)
             {
-                var glowLine = _circleGlowLines[i];
-                glowLine.X1 = x1;
-                glowLine.Y1 = y1;
-                glowLine.X2 = x2;
-                glowLine.Y2 = y2;
-                glowLine.StrokeThickness = localThickness * 1.5;
-                glowLine.Opacity = 0.3;
-                if (!ReferenceEquals(glowLine.Stroke, _barBrush)) glowLine.Stroke = _barBrush;
-            }
-            else if (_circleGlowLines.Count == data.Length)
-            {
-                _circleGlowLines[i].Opacity = 0.0;
+                dc.PushOpacity(0.3);
+                dc.DrawLine(new Pen(_barBrush, localThickness * 1.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, new System.Windows.Point(x1, y1), new System.Windows.Point(x2, y2));
+                dc.Pop();
             }
 
-            if (_circleLines.Count == data.Length)
-            {
-                var line = _circleLines[i];
-                line.X1 = x1;
-                line.Y1 = y1;
-                line.X2 = x2;
-                line.Y2 = y2;
-                line.StrokeThickness = localThickness;
-                if (!ReferenceEquals(line.Stroke, _barBrush)) line.Stroke = _barBrush;
-            }
+            dc.DrawLine(new Pen(_barBrush, localThickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, new System.Windows.Point(x1, y1), new System.Windows.Point(x2, y2));
         }
     }
 
-    private void EnsureBars(int count)
+    private void ClearDrawing()
     {
-        if (_bars.Count == count) return;
-        BarsCanvas.Children.Clear();
-        _bars.Clear();
-        _peakBars.Clear();
-        _glowBars.Clear();
-        _peaks = count > 0 ? new float[count] : null;
-
-        for (int i = 0; i < count; i++)
-        {
-            var glow = new System.Windows.Shapes.Rectangle
-            {
-                Fill = _barBrush,
-                RadiusX = 1,
-                RadiusY = 1,
-                Opacity = 0.0
-            };
-            _glowBars.Add(glow);
-            BarsCanvas.Children.Add(glow);
-
-            var r = new System.Windows.Shapes.Rectangle
-            {
-                Fill = _barBrush,
-                RadiusX = 1,
-                RadiusY = 1
-            };
-            _bars.Add(r);
-            BarsCanvas.Children.Add(r);
-            var peak = new System.Windows.Shapes.Rectangle
-            {
-                Fill = _peakBrush,
-                Opacity = 0.85
-            };
-            _peakBars.Add(peak);
-            BarsCanvas.Children.Add(peak);
-        }
-        LayoutBars();
+        using var dc = _drawingGroup.Open();
     }
 
     private void LayoutBars()
     {
-        if (_bars.Count == 0) return;
-        var width = BarsCanvas.ActualWidth;
-        var height = BarsCanvas.ActualHeight;
-        if (width <= 0 || height <= 0) return;
-
-        var spacing = 2.0;
-        var barWidth = Math.Max(1.0, (width - spacing * (_bars.Count - 1)) / _bars.Count);
-        for (int i = 0; i < _bars.Count; i++)
-        {
-            var left = i * (barWidth + spacing);
-            var rect = _bars[i];
-            rect.Width = barWidth;
-            Canvas.SetLeft(rect, left);
-            var peak = _peakBars[i];
-            peak.Width = barWidth;
-            Canvas.SetLeft(peak, left);
-        }
-    }
-
-    private void ClearAllShapes()
-    {
-        BarsCanvas.Children.Clear();
-        _bars.Clear();
-        _peakBars.Clear();
-        _glowBars.Clear();
-        _circleLines.Clear();
-        _circleGlowLines.Clear();
-        _peaks = null;
-    }
-
-    private void EnsureCircularLines(int count, bool glowEnabled)
-    {
-        if (_circleLines.Count == count && (!glowEnabled || _circleGlowLines.Count == count))
-            return;
-
-        ClearAllShapes();
-
-        for (int i = 0; i < count; i++)
-        {
-            if (glowEnabled)
-            {
-                var glowLine = new System.Windows.Shapes.Line
-                {
-                    Stroke = _barBrush,
-                    StrokeThickness = 1.0,
-                    StrokeStartLineCap = PenLineCap.Round,
-                    StrokeEndLineCap = PenLineCap.Round,
-                    Opacity = 0.0
-                };
-                _circleGlowLines.Add(glowLine);
-                BarsCanvas.Children.Add(glowLine);
-            }
-
-            var line = new System.Windows.Shapes.Line
-            {
-                Stroke = _barBrush,
-                StrokeThickness = 1.0,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round
-            };
-            _circleLines.Add(line);
-            BarsCanvas.Children.Add(line);
-        }
+        // Drawing is sized against the current ActualWidth/ActualHeight; no layout work needed.
     }
 
     public void ResetOffset()

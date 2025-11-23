@@ -13,7 +13,7 @@ public sealed class SpectrumProcessor
     private double[]? _mag;
     private double[]? _hann;
     private int _n;
-    private BinCache? _binCache;
+    private FilterbankCache? _filterbankCache;
 
     public float[] ComputeBars(AudioFrame frame, int bars)
     {
@@ -71,22 +71,24 @@ public sealed class SpectrumProcessor
         double fMax = Math.Min(18000.0, nyquist);
         if (fMax <= fMin) return result;
 
-        // Reuse precomputed bin ranges for this bars/sampleRate/magLength combination.
-        var bins = GetOrBuildBins(bars, sampleRate, mag.Length, fMin, fMax, nyquist);
-        var starts = bins.Starts;
-        var ends = bins.Ends;
+        // Reuse precomputed mel filterbank for this bars/sampleRate/magLength combination.
+        var filterbank = GetOrBuildFilterbank(bars, sampleRate, mag.Length, fMin, fMax, nyquist);
 
         for (int b = 0; b < bars; b++)
         {
-            int i1 = starts[b];
-            int i2 = ends[b];
-            double sum = 0.0;
-            int count = 0;
-            for (int i = i1; i <= i2; i++) { sum += mag[i]; count++; }
-            double avg = count > 0 ? sum / count : 0.0;
+            var filter = filterbank.Filters[b];
+            var weights = filter.Weights;
+            double energy = 0.0;
+            for (int i = 0; i < weights.Length; i++)
+            {
+                int bin = filter.Start + i;
+                energy += mag[bin] * weights[i];
+            }
 
-            double compressed = Math.Sqrt(avg);
-            double scaled = compressed * 1.8;
+            // Perceptual compression: log-like curve keeps low levels visible without
+            // flattening strong transients.
+            double logEnergy = Math.Log10(1.0 + energy * 9.0);
+            double scaled = logEnergy * 1.1;
             result[b] = (float)Math.Clamp(scaled, 0.0, 1.0);
         }
         return result;
@@ -99,41 +101,80 @@ public sealed class SpectrumProcessor
         return p;
     }
 
-    private BinCache GetOrBuildBins(int bars, int sampleRate, int magLength, double fMin, double fMax, double nyquist)
+    private FilterbankCache GetOrBuildFilterbank(int bars, int sampleRate, int magLength, double fMin, double fMax, double nyquist)
     {
         lock (_lock)
         {
-            var key = new BinCacheKey(bars, sampleRate, magLength);
-            var cache = _binCache;
+            var key = new FilterbankCacheKey(bars, sampleRate, magLength);
+            var cache = _filterbankCache;
             if (cache.HasValue && cache.Value.Key.Equals(key))
             {
                 return cache.Value;
             }
 
-            var starts = new int[bars];
-            var ends = new int[bars];
+            var filters = new Filter[bars];
+
+            double melMin = HzToMel(fMin);
+            double melMax = HzToMel(fMax);
+            double melStep = (melMax - melMin) / (bars + 1);
+
             for (int b = 0; b < bars; b++)
             {
-                double t1 = (double)b / bars;
-                double t2 = (double)(b + 1) / bars;
-                double f1 = fMin * Math.Pow(fMax / fMin, t1);
-                double f2 = fMin * Math.Pow(fMax / fMin, t2);
+                double melL = melMin + b * melStep;
+                double melC = melMin + (b + 1) * melStep;
+                double melR = melMin + (b + 2) * melStep;
 
-                int i1 = (int)Math.Clamp(Math.Round(f1 / nyquist * (magLength - 1)), 1, magLength - 1);
-                int i2 = (int)Math.Clamp(Math.Round(f2 / nyquist * (magLength - 1)), i1 + 1, magLength - 1);
-                starts[b] = i1;
-                ends[b] = i2;
+                double fL = MelToHz(melL);
+                double fC = MelToHz(melC);
+                double fR = MelToHz(melR);
+
+                int iStart = (int)Math.Clamp(Math.Floor(fL / nyquist * (magLength - 1)), 0, magLength - 1);
+                int iEnd = (int)Math.Clamp(Math.Ceiling(fR / nyquist * (magLength - 1)), iStart + 1, magLength - 1);
+                int len = iEnd - iStart + 1;
+                var weights = new double[len];
+                double sum = 0.0;
+                for (int i = 0; i < len; i++)
+                {
+                    int bin = iStart + i;
+                    double freq = (double)bin / (magLength - 1) * nyquist;
+                    double w;
+                    if (freq <= fL || freq >= fR)
+                    {
+                        w = 0.0;
+                    }
+                    else if (freq <= fC)
+                    {
+                        w = (freq - fL) / Math.Max(1e-6, fC - fL);
+                    }
+                    else
+                    {
+                        w = (fR - freq) / Math.Max(1e-6, fR - fC);
+                    }
+                    w = Math.Max(0.0, w);
+                    weights[i] = w;
+                    sum += w;
+                }
+
+                if (sum > 1e-9)
+                {
+                    for (int i = 0; i < len; i++) weights[i] /= sum;
+                }
+
+                filters[b] = new Filter(iStart, iEnd, weights);
             }
 
-            var built = new BinCache(key, starts, ends);
-            _binCache = built;
+            var built = new FilterbankCache(key, filters);
+            _filterbankCache = built;
             return built;
         }
     }
 
-    private readonly struct BinCacheKey : IEquatable<BinCacheKey>
+    private static double HzToMel(double hz) => 2595.0 * Math.Log10(1.0 + hz / 700.0);
+    private static double MelToHz(double mel) => 700.0 * (Math.Pow(10.0, mel / 2595.0) - 1.0);
+
+    private readonly struct FilterbankCacheKey : IEquatable<FilterbankCacheKey>
     {
-        public BinCacheKey(int bars, int sampleRate, int magLength)
+        public FilterbankCacheKey(int bars, int sampleRate, int magLength)
         {
             Bars = bars;
             SampleRate = sampleRate;
@@ -144,24 +185,36 @@ public sealed class SpectrumProcessor
         public int SampleRate { get; }
         public int MagLength { get; }
 
-        public bool Equals(BinCacheKey other) =>
+        public bool Equals(FilterbankCacheKey other) =>
             Bars == other.Bars && SampleRate == other.SampleRate && MagLength == other.MagLength;
-        public override bool Equals(object? obj) => obj is BinCacheKey other && Equals(other);
+        public override bool Equals(object? obj) => obj is FilterbankCacheKey other && Equals(other);
         public override int GetHashCode() => HashCode.Combine(Bars, SampleRate, MagLength);
     }
 
-    private readonly struct BinCache
+    private readonly struct FilterbankCache
     {
-        public BinCache(BinCacheKey key, int[] starts, int[] ends)
+        public FilterbankCache(FilterbankCacheKey key, Filter[] filters)
         {
             Key = key;
-            Starts = starts;
-            Ends = ends;
+            Filters = filters;
         }
 
-        public BinCacheKey Key { get; }
-        public int[] Starts { get; }
-        public int[] Ends { get; }
-        public bool HasValue => Starts != null && Ends != null;
+        public FilterbankCacheKey Key { get; }
+        public Filter[] Filters { get; }
+        public bool HasValue => Filters != null;
+    }
+
+    private readonly struct Filter
+    {
+        public Filter(int start, int end, double[] weights)
+        {
+            Start = start;
+            End = end;
+            Weights = weights;
+        }
+
+        public int Start { get; }
+        public int End { get; }
+        public double[] Weights { get; }
     }
 }
