@@ -10,6 +10,7 @@ using Equalizer.Application.Abstractions;
 using Equalizer.Application.Models;
 using Equalizer.Domain;
 using Equalizer.Presentation.Controls;
+using Image = System.Windows.Controls.Image;
 
 namespace Equalizer.Presentation.Overlay;
 
