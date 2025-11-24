@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,8 @@ public partial class SettingsWindow : Window
     private readonly Process _currentProcess;
     private TimeSpan _lastCpuTime;
     private DateTime _lastCpuSample;
+    private readonly List<PerformanceCounter> _gpuCounters = new();
+    private bool _gpuAvailable;
 
     public SettingsWindow(ISettingsPort settings, Overlay.IOverlayManager overlay)
     {
@@ -59,8 +62,13 @@ public partial class SettingsWindow : Window
         };
         _resourceTimer.Tick += ResourceTimer_Tick;
         _resourceTimer.Start();
+        InitializeGpuCounters();
 
-        Closed += (_, __) => _resourceTimer.Stop();
+        Closed += (_, __) =>
+        {
+            _resourceTimer.Stop();
+            DisposeGpuCounters();
+        };
     }
 
     private void ResourceTimer_Tick(object? sender, EventArgs e)
@@ -87,6 +95,32 @@ public partial class SettingsWindow : Window
             CpuUsageText.Text = $"CPU: {cpuPercent:0.0}%";
             MemoryUsageText.Text = $"RAM: {memMb:0.0} MB";
 
+            var gpuText = "GPU: n/a";
+            if (_gpuAvailable)
+            {
+                double total = 0.0;
+                int count = 0;
+                foreach (var counter in _gpuCounters)
+                {
+                    try
+                    {
+                        total += counter.NextValue();
+                        count++;
+                    }
+                    catch
+                    {
+                        // ignore individual counter failures
+                    }
+                }
+
+                if (count > 0)
+                {
+                    var gpuPercent = Math.Clamp(total, 0.0, 100.0);
+                    gpuText = $"GPU: {gpuPercent:0.0}%";
+                }
+            }
+            GpuUsageText.Text = gpuText;
+
             var overlayFps = _overlay.GetCurrentFps();
             if (overlayFps.HasValue)
             {
@@ -102,6 +136,50 @@ public partial class SettingsWindow : Window
         {
             // Non-fatal: best-effort diagnostics only
         }
+    }
+
+    private void InitializeGpuCounters()
+    {
+        try
+        {
+            const string categoryName = "GPU Engine";
+            if (!PerformanceCounterCategory.Exists(categoryName)) return;
+
+            var category = new PerformanceCounterCategory(categoryName);
+            foreach (var instance in category.GetInstanceNames())
+            {
+                if (!instance.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                foreach (var counter in category.GetCounters(instance))
+                {
+                    if (string.Equals(counter.CounterName, "Utilization Percentage", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _gpuCounters.Add(counter);
+                    }
+                    else
+                    {
+                        counter.Dispose();
+                    }
+                }
+            }
+
+            _gpuAvailable = _gpuCounters.Count > 0;
+        }
+        catch
+        {
+            _gpuAvailable = false;
+            DisposeGpuCounters();
+        }
+    }
+
+    private void DisposeGpuCounters()
+    {
+        foreach (var c in _gpuCounters)
+        {
+            try { c.Dispose(); } catch { }
+        }
+        _gpuCounters.Clear();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)

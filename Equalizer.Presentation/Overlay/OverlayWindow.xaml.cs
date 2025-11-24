@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Equalizer.Application.Abstractions;
 using Equalizer.Application.Models;
 using Equalizer.Domain;
@@ -28,6 +29,7 @@ public partial class OverlayWindow : Window
     private readonly System.Windows.Media.Pen _barPen;
     private readonly System.Windows.Media.Pen _glowPen;
     private readonly TranslateTransform _offset = new TranslateTransform();
+    private readonly DispatcherTimer _settingsRefreshTimer;
     private bool _isDragging;
     private System.Windows.Point _dragStartPoint;
     private System.Windows.Point _startOffset;
@@ -35,7 +37,6 @@ public partial class OverlayWindow : Window
     private readonly object _settingsCacheLock = new();
     private EqualizerSettings? _settingsSnapshot;
     private DateTime _settingsSnapshotAt;
-    private Task<EqualizerSettings>? _settingsFetchTask;
     private double _lastMeasuredFps;
     private DateTime _lastFpsSampleAt = DateTime.MinValue;
 
@@ -57,7 +58,11 @@ public partial class OverlayWindow : Window
 
         Loaded += (_, __) => { System.Windows.Media.CompositionTarget.Rendering += OnRendering; };
         Unloaded += (_, __) => { System.Windows.Media.CompositionTarget.Rendering -= OnRendering; };
-        Closed += (_, __) => _cts.Cancel();
+        Closed += (_, __) =>
+        {
+            _cts.Cancel();
+            _settingsRefreshTimer.Stop();
+        };
         BarsCanvas.RenderTransform = _offset;
         BarsCanvas.MouseLeftButtonDown += BarsCanvas_MouseLeftButtonDown;
         BarsCanvas.MouseMove += BarsCanvas_MouseMove;
@@ -72,6 +77,13 @@ public partial class OverlayWindow : Window
         QuickColorB.ValueChanged += QuickColorSlider_ValueChanged;
         QuickEyedropperButton.Click += QuickEyedropperButton_Click;
         _ = ApplyInitialOffsetAsync();
+        _settingsRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _settingsRefreshTimer.Tick += async (_, __) => await RefreshSettingsSnapshotAsync();
+        _settingsRefreshTimer.Start();
+        _ = RefreshSettingsSnapshotAsync();
     }
 
     private async Task ApplyInitialOffsetAsync()
@@ -94,7 +106,7 @@ public partial class OverlayWindow : Window
         {
             if (!IsVisible) return;
 
-            var s = await GetSettingsSnapshotAsync();
+            if (!TryGetSettingsSnapshot(out var s) || s == null) return;
 
             var now = DateTime.UtcNow;
             var minIntervalMs = 1000.0 / Math.Clamp(s.TargetFps, 10, 240);
@@ -514,33 +526,32 @@ public partial class OverlayWindow : Window
         return ((int)(r * 255), (int)(g * 255), (int)(b * 255));
     }
 
-    private Task<EqualizerSettings> GetSettingsSnapshotAsync()
+    private bool TryGetSettingsSnapshot(out EqualizerSettings? settings)
     {
         lock (_settingsCacheLock)
         {
-            if (_settingsSnapshot != null && (DateTime.UtcNow - _settingsSnapshotAt).TotalMilliseconds < 500)
-            {
-                return Task.FromResult(_settingsSnapshot);
-            }
-
-            if (_settingsFetchTask == null || _settingsFetchTask.IsCompleted)
-            {
-                _settingsFetchTask = FetchSettingsAsync();
-            }
-
-            return _settingsFetchTask;
+            var fresh = _settingsSnapshot != null &&
+                        (DateTime.UtcNow - _settingsSnapshotAt).TotalMilliseconds < 1000;
+            settings = fresh ? _settingsSnapshot : null;
+            return fresh;
         }
     }
 
-    private async Task<EqualizerSettings> FetchSettingsAsync()
+    private async Task RefreshSettingsSnapshotAsync()
     {
-        var s = await _settings.GetAsync();
-        lock (_settingsCacheLock)
+        try
         {
-            _settingsSnapshot = s;
-            _settingsSnapshotAt = DateTime.UtcNow;
+            var s = await _settings.GetAsync();
+            lock (_settingsCacheLock)
+            {
+                _settingsSnapshot = s;
+                _settingsSnapshotAt = DateTime.UtcNow;
+            }
         }
-        return s;
+        catch
+        {
+            // Ignore transient settings load errors; keep last snapshot
+        }
     }
 
     public double LastMeasuredFps => _lastMeasuredFps;

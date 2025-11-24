@@ -158,6 +158,9 @@
                 <TextBlock x:Name="CpuUsageText" Text="CPU: -- %" Margin="0,0,16,0" />
             </StatusBarItem>
             <StatusBarItem>
+                <TextBlock x:Name="GpuUsageText" Text="GPU: -- %" Margin="0,0,16,0" />
+            </StatusBarItem>
+            <StatusBarItem>
                 <TextBlock x:Name="MemoryUsageText" Text="RAM: -- MB" />
             </StatusBarItem>
             <StatusBarItem>
