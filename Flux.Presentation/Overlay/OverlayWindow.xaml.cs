@@ -77,6 +77,7 @@ public partial class OverlayWindow : Window
         };
         BarsCanvas.RenderTransform = _offset;
         SkiaCanvas.RenderTransform = _offset;
+        // WidgetCanvas has NO transform - widgets use absolute screen positions
         BarsCanvas.MouseLeftButtonDown += BarsCanvas_MouseLeftButtonDown;
         BarsCanvas.MouseMove += BarsCanvas_MouseMove;
         BarsCanvas.MouseLeftButtonUp += BarsCanvas_MouseLeftButtonUp;
@@ -85,6 +86,10 @@ public partial class OverlayWindow : Window
         SkiaCanvas.MouseMove += BarsCanvas_MouseMove;
         SkiaCanvas.MouseLeftButtonUp += BarsCanvas_MouseLeftButtonUp;
         SkiaCanvas.MouseRightButtonUp += BarsCanvas_MouseRightButtonUp;
+        // Widget canvas mouse events for widget dragging
+        WidgetCanvas.MouseLeftButtonDown += WidgetCanvas_MouseLeftButtonDown;
+        WidgetCanvas.MouseMove += WidgetCanvas_MouseMove;
+        WidgetCanvas.MouseLeftButtonUp += WidgetCanvas_MouseLeftButtonUp;
         SaveMoveButton.Click += SaveMoveButton_Click;
         CancelMoveButton.Click += CancelMoveButton_Click;
         QuickApplyButton.Click += QuickApplyButton_Click;
@@ -221,18 +226,21 @@ public partial class OverlayWindow : Window
                     {
                         RenderLinearBars(dc, vf, data, s, width, height, spacing);
                     }
-                    
-                    // Render additional widgets
+                }
+                
+                // Render widgets to separate canvas (no transform applied)
+                using (var wdc = WidgetCanvas.RenderOpen())
+                {
                     if (_widgetManager != null)
                     {
                         _widgetManager.UpdateWidgets();
-                        _widgetManager.RenderWidgets(dc, width, height);
+                        _widgetManager.RenderWidgets(wdc, width, height);
                     }
                     
                     // Render widget edit overlay
                     if (_widgetManager?.EditMode == true)
                     {
-                        _widgetManager.RenderEditOverlay(dc, width, height);
+                        _widgetManager.RenderEditOverlay(wdc, width, height);
                     }
                 }
             }
@@ -452,6 +460,34 @@ public partial class OverlayWindow : Window
         _isDragging = false;
         BarsCanvas.ReleaseMouseCapture();
         ConfirmPanel.Visibility = Visibility.Visible;
+    }
+
+    // Widget canvas mouse handlers - separate from visualizer dragging
+    private void WidgetCanvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_widgetManager?.EditMode != true) return;
+        var pos = e.GetPosition(WidgetCanvas);
+        _widgetManager.StartDrag(pos, WidgetCanvas.ActualWidth, WidgetCanvas.ActualHeight);
+        if (_widgetManager.SelectedWidget != null)
+        {
+            WidgetCanvas.CaptureMouse();
+        }
+    }
+
+    private void WidgetCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_widgetManager?.EditMode != true) return;
+        var pos = e.GetPosition(WidgetCanvas);
+        _widgetManager.UpdateDrag(pos);
+    }
+
+    private void WidgetCanvas_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_widgetManager?.EditMode != true) return;
+        _widgetManager.EndDrag();
+        WidgetCanvas.ReleaseMouseCapture();
+        // Save widget layout after drag
+        _ = _widgetManager.SaveLayoutAsync();
     }
 
     private async void BarsCanvas_MouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)

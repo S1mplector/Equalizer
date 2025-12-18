@@ -12,6 +12,7 @@
     <Grid>
         <overlay:VisualizerSurface x:Name="BarsCanvas" ClipToBounds="True" SnapsToDevicePixels="True"/>
         <skia:SKElement x:Name="SkiaCanvas" Visibility="Collapsed" PaintSurface="SkiaCanvas_PaintSurface"/>
+        <overlay:VisualizerSurface x:Name="WidgetCanvas" ClipToBounds="True" SnapsToDevicePixels="True"/>
         <TextBlock x:Name="PerfText" Foreground="White" FontSize="11" Margin="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Opacity="0.8" Visibility="Collapsed"/>
         <Border x:Name="ConfirmPanel" Background="#DD000000" CornerRadius="6" Padding="10" Width="260" Height="80" Visibility="Collapsed"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,20,0,0">
