@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text.Json;
 using Flux.Application.Abstractions;
 using Flux.Domain.Widgets;
@@ -6,12 +8,24 @@ namespace Flux.Infrastructure.Widgets;
 
 public sealed class JsonWidgetLayoutRepository : IWidgetLayoutPort
 {
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Flux", "widgets.json");
-
+    private readonly string _filePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private WidgetLayout? _cache;
+
+    public JsonWidgetLayoutRepository() : this(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Flux"))
+    {
+    }
+
+    public JsonWidgetLayoutRepository(string baseDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(baseDirectory))
+            throw new ArgumentException("Base directory cannot be null or empty.", nameof(baseDirectory));
+
+        Directory.CreateDirectory(baseDirectory);
+        _filePath = Path.Combine(baseDirectory, "widgets.json");
+    }
 
     public async Task<WidgetLayout> GetLayoutAsync()
     {
@@ -20,13 +34,13 @@ public sealed class JsonWidgetLayoutRepository : IWidgetLayoutPort
         {
             if (_cache != null) return _cache;
 
-            if (!File.Exists(FilePath))
+            if (!File.Exists(_filePath))
             {
                 _cache = WidgetLayout.Default;
                 return _cache;
             }
 
-            var json = await File.ReadAllTextAsync(FilePath);
+            var json = await File.ReadAllTextAsync(_filePath);
             var dto = JsonSerializer.Deserialize<WidgetLayoutDto>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -52,7 +66,7 @@ public sealed class JsonWidgetLayoutRepository : IWidgetLayoutPort
         try
         {
             _cache = layout;
-            var dir = Path.GetDirectoryName(FilePath)!;
+            var dir = Path.GetDirectoryName(_filePath)!;
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
             var dto = WidgetLayoutDto.FromDomain(layout);
@@ -60,7 +74,7 @@ public sealed class JsonWidgetLayoutRepository : IWidgetLayoutPort
             {
                 WriteIndented = true
             });
-            await File.WriteAllTextAsync(FilePath, json);
+            await File.WriteAllTextAsync(_filePath, json);
         }
         finally
         {

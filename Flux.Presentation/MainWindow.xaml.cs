@@ -54,13 +54,17 @@ public partial class MainWindow : Window
             }
             _lastFrame = now;
 
-            if (_pendingBars == null || _pendingBars.IsCompleted)
+            if (_pendingBars == null)
             {
                 _pendingBars = _service.GetBarsAsync(_cts.Token);
             }
-            if (_pendingBars != null && _pendingBars.IsCompletedSuccessfully)
+            else if (_pendingBars.IsCompleted)
             {
-                _lastBars = _pendingBars.Result;
+                if (_pendingBars.Status == TaskStatus.RanToCompletion)
+                {
+                    _lastBars = await _pendingBars.ConfigureAwait(true);
+                }
+                _pendingBars = null;
             }
 
             var data = _lastBars;

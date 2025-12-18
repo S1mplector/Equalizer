@@ -15,12 +15,19 @@ public sealed class JsonSettingsRepository : ISettingsPort
     private readonly SemaphoreSlim _mutex = new(1, 1);
     private FluxSettings? _cache;
 
-    public JsonSettingsRepository()
+    public JsonSettingsRepository() : this(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Flux"))
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dir = Path.Combine(appData, "Flux");
-        Directory.CreateDirectory(dir);
-        _filePath = Path.Combine(dir, "settings.json");
+    }
+
+    public JsonSettingsRepository(string baseDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(baseDirectory))
+            throw new ArgumentException("Base directory cannot be null or empty.", nameof(baseDirectory));
+
+        Directory.CreateDirectory(baseDirectory);
+        _filePath = Path.Combine(baseDirectory, "settings.json");
     }
 
     public async Task<FluxSettings> GetAsync()

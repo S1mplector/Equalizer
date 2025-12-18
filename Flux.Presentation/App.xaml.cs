@@ -1,5 +1,8 @@
+using System;
+using System.IO;
 using System.Windows;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Flux.Application.DependencyInjection;
@@ -20,10 +23,15 @@ public partial class App : System.Windows.Application
 {
     private IHost? _host;
     public static bool IsShuttingDown { get; private set; }
+    private readonly object _logLock = new();
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         var splash = new SplashWindow();
         splash.Show();
@@ -105,6 +113,65 @@ public partial class App : System.Windows.Application
             _host.Dispose();
         }
         base.OnExit(e);
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        LogException("DispatcherUnhandledException", e.Exception);
+        if (!IsShuttingDown)
+        {
+            System.Windows.MessageBox.Show(
+                "Flux hit an unexpected error. A log was written to the logs folder in %AppData%/Flux.",
+                "Flux error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        e.Handled = true;
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        var ex = e.ExceptionObject as Exception ?? new Exception("Unknown unhandled exception");
+        LogException("UnhandledException", ex);
+        if (!IsShuttingDown)
+        {
+            System.Windows.MessageBox.Show(
+                "Flux hit an unexpected error and must close. See %AppData%/Flux/logs for details.",
+                "Flux error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        LogException("UnobservedTaskException", e.Exception);
+        e.SetObserved();
+    }
+
+    private void LogException(string source, Exception ex)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var dir = Path.Combine(appData, "Flux", "logs");
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, $"flux-{DateTime.UtcNow:yyyyMMdd}.log");
+            var lines = new[]
+            {
+                $"[{DateTime.UtcNow:O}] {source}",
+                ex.ToString(),
+                new string('-', 60)
+            };
+            lock (_logLock)
+            {
+                File.AppendAllLines(file, lines);
+            }
+        }
+        catch
+        {
+            // If logging fails, avoid crashing the app due to logging.
+        }
     }
 }
 

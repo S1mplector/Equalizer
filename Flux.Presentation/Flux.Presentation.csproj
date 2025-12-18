@@ -29,14 +29,28 @@
 
   <PropertyGroup>
     <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <BaseVersion>1.0.0</BaseVersion>
+    <Version>$(BaseVersion)</Version>
     <FileVersion>$(Version)</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
+    <AssemblyVersion>$(BaseVersion).0</AssemblyVersion>
+    <CommitHash Condition="'$(CommitHash)' == '' and '$(GitCommitIdShort)' != ''">$(GitCommitIdShort)</CommitHash>
+    <CommitHash Condition="'$(CommitHash)' == '' and '$(SourceRevisionId)' != ''">$(SourceRevisionId)</CommitHash>
+    <CommitHash Condition="'$(CommitHash)' == ''">local</CommitHash>
+    <AssemblyInformationalVersion>$(Version)+$(CommitHash)</AssemblyInformationalVersion>
     <Product>Flux</Product>
     <Company>Flux</Company>
     <PackageId>Flux.Presentation</PackageId>
     <UseAppHost>true</UseAppHost>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
+  <Target Name="PopulateGitInfo" BeforeTargets="GenerateAssemblyInfo" Condition="'$(GitCommitIdShort)' == ''">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitIdShort" />
+    </Exec>
+    <PropertyGroup>
+      <GitCommitIdShort>$(GitCommitIdShort.Trim())</GitCommitIdShort>
+    </PropertyGroup>
+  </Target>
 
 </Project>

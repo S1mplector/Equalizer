@@ -74,7 +74,7 @@ public partial class OverlayWindow : Window
         Closed += (_, __) =>
         {
             _cts.Cancel();
-            _settingsRefreshTimer.Stop();
+            _settingsRefreshTimer?.Stop();
         };
         BarsCanvas.RenderTransform = _offset;
         SkiaCanvas.RenderTransform = _offset;
@@ -176,13 +176,17 @@ public partial class OverlayWindow : Window
 
             var frameStart = DateTime.UtcNow;
 
-            if (_pendingFrameTask == null || _pendingFrameTask.IsCompleted)
+            if (_pendingFrameTask == null)
             {
                 _pendingFrameTask = _service.GetVisualizerFrameAsync(_cts.Token);
             }
-            if (_pendingFrameTask != null && _pendingFrameTask.IsCompletedSuccessfully)
+            else if (_pendingFrameTask.IsCompleted)
             {
-                _lastFrameData = _pendingFrameTask.Result;
+                if (_pendingFrameTask.Status == TaskStatus.RanToCompletion)
+                {
+                    _lastFrameData = await _pendingFrameTask.ConfigureAwait(true);
+                }
+                _pendingFrameTask = null;
             }
 
             var vf = _lastFrameData;
@@ -298,6 +302,8 @@ public partial class OverlayWindow : Window
         var barWidth = Math.Max(1.0, (width - spacing * (data.Length - 1)) / data.Length);
         _glowBrush.Opacity = s.GlowEnabled ? 0.35 : 0.0;
         EnsurePeaks(data.Length);
+        var peaks = _peaks;
+        if (peaks == null) return;
         var peakBarHeight = Math.Max(2.0, Math.Min(4.0, height * 0.01));
         var cornerRadius = s.BarCornerRadius;
         
@@ -358,9 +364,9 @@ public partial class OverlayWindow : Window
             dc.DrawRoundedRectangle(barBrush, null, new Rect(left, top, w, h), cornerRadius, cornerRadius);
 
             var amp = (float)Math.Clamp(data[i] * scale * fade, 0.0, 1.0);
-            var decayed = _peaks[i] * 0.985f;
-            _peaks[i] = Math.Max(decayed, amp);
-            var peakH = Math.Max(1.0, _peaks[i] * height * fade);
+            var decayed = peaks[i] * 0.985f;
+            peaks[i] = Math.Max(decayed, amp);
+            var peakH = Math.Max(1.0, peaks[i] * height * fade);
             var peakTop = Math.Max(0.0, height - peakH - peakBarHeight);
             dc.DrawRectangle(_peakBrush, null, new Rect(left, peakTop, w, peakBarHeight));
         }

@@ -43,38 +43,86 @@ function Ensure-Icon {
         [Parameter(Mandatory)] [string]$IcoPath
     )
 
-    if (Test-Path -LiteralPath $IcoPath) { return }
     if (-not (Test-Path -LiteralPath $PngPath)) {
         throw "Icon source not found at $PngPath"
     }
 
-    Write-Info "Generating .ico from $PngPath -> $IcoPath"
+    Write-Info "Generating multi-size .ico from $PngPath -> $IcoPath"
 
     Add-Type -AssemblyName System.Drawing
-    Add-Type -Namespace IconUtil -Name NativeMethods -MemberDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public static class NativeMethods {
-    [DllImport("user32.dll", SetLastError=true)]
-    public static extern bool DestroyIcon(IntPtr hIcon);
-}
-"@
+    $sizes = 16,24,32,48,64,128,256
+    $bitmaps = @()
+    $pngStreams = @()
 
-    $bmp = [System.Drawing.Bitmap]::FromFile($PngPath)
-    # Normalize to 256x256 for a clean app icon
-    if ($bmp.Width -ne 256 -or $bmp.Height -ne 256) {
-        $bmp = New-Object System.Drawing.Bitmap($bmp, 256, 256)
-    }
+    $src = [System.Drawing.Bitmap]::FromFile($PngPath)
+    $maxDim = [Math]::Max($src.Width, $src.Height)
+    $baseBitmap = New-Object System.Drawing.Bitmap($maxDim, $maxDim, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $baseGraphics = [System.Drawing.Graphics]::FromImage($baseBitmap)
+    $baseGraphics.Clear([System.Drawing.Color]::Transparent)
+    $baseGraphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $baseGraphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $baseGraphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
 
-    $hIcon = $bmp.GetHicon()
+    $scale = [Math]::Min($maxDim / $src.Width, $maxDim / $src.Height)
+    $drawW = [int][Math]::Round($src.Width * $scale)
+    $drawH = [int][Math]::Round($src.Height * $scale)
+    $offsetX = [int](($maxDim - $drawW) / 2)
+    $offsetY = [int](($maxDim - $drawH) / 2)
+    $baseGraphics.DrawImage($src, $offsetX, $offsetY, $drawW, $drawH)
+    $baseGraphics.Dispose()
+    $src.Dispose()
+
     try {
-        $icon = [System.Drawing.Icon]::FromHandle($hIcon)
+        foreach ($size in $sizes) {
+            $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.Clear([System.Drawing.Color]::Transparent)
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+            $g.DrawImage($baseBitmap, 0, 0, $size, $size)
+            $g.Dispose()
+
+            $ms = New-Object System.IO.MemoryStream
+            $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+            $pngStreams += [PSCustomObject]@{ Size = $size; Bytes = $ms.ToArray() }
+
+            $ms.Dispose()
+            $bmp.Dispose()
+        }
+
         $fs = [IO.File]::Open($IcoPath, [IO.FileMode]::Create)
-        try { $icon.Save($fs) } finally { $fs.Dispose() }
-        $icon.Dispose()
-    } finally {
-        if ($bmp) { $bmp.Dispose() }
-        [IconUtil.NativeMethods]::DestroyIcon($hIcon) | Out-Null
+        $bw = New-Object System.IO.BinaryWriter($fs)
+
+        $bw.Write([UInt16]0)      # reserved
+        $bw.Write([UInt16]1)      # type: icon
+        $bw.Write([UInt16]$pngStreams.Count) # count
+
+        $offset = 6 + (16 * $pngStreams.Count)
+        foreach ($entry in $pngStreams) {
+            $s = $entry.Size
+            $bytes = $entry.Bytes
+            $bw.Write([byte]$(if ($s -eq 256) { 0 } else { $s })) # width
+            $bw.Write([byte]$(if ($s -eq 256) { 0 } else { $s })) # height
+            $bw.Write([byte]0) # color count
+            $bw.Write([byte]0) # reserved
+            $bw.Write([UInt16]1) # planes
+            $bw.Write([UInt16]32) # bit count
+            $bw.Write([UInt32]$bytes.Length) # size
+            $bw.Write([UInt32]$offset) # offset
+            $offset += $bytes.Length
+        }
+
+        foreach ($entry in $pngStreams) {
+            $bw.Write($entry.Bytes)
+        }
+
+        $bw.Flush()
+        $bw.Dispose()
+        $fs.Dispose()
+    }
+    finally {
+        if ($baseBitmap) { $baseBitmap.Dispose() }
     }
 }
 
@@ -101,9 +149,9 @@ try {
         throw "Project not found at $projectPath"
     }
 
-    $pngIcon = Join-Path $root "Flux.Presentation/Resources/icon.png"
-    $icoIcon = Join-Path $root "Flux.Presentation/Resources/icon.ico"
-    Ensure-Icon -PngPath $pngIcon -IcoPath $icoIcon
+        $pngIcon = Join-Path $root "Flux.Presentation/Resources/icon.png"
+        $icoIcon = Join-Path $root "Flux.Presentation/Resources/icon.ico"
+        Ensure-Icon -PngPath $pngIcon -IcoPath $icoIcon
 
     $publishArgs = @(
         "publish", $projectPath,
