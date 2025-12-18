@@ -1,30 +1,31 @@
-# Equalizer
+# Flux
 
-A lightweight Windows WPF overlay that draws a configurable, reactive audio visualizer on top of your desktop wallpaper. Designed with a clean hexagonal architecture
-
-## Architecture
-- **Domain** (`Equalizer.Domain/`): Core models and invariants, e.g., `EqualizerSettings`, `ColorRgb`.
-- **Application** (`Equalizer.Application/`): Use-cases and ports, services like `IEqualizerService`, `SpectrumProcessor`.
-- **Infrastructure** (`Equalizer.Infrastructure/`): Adapters like `WASAPILoopbackAudioInput` (real audio capture with NAudio) and `JsonSettingsRepository`.
-- **Presentation** (`Equalizer.Presentation/`): WPF app with DI host, system tray, overlay windows, settings UI, and global hotkeys.
+A lightweight Windows desktop customization tool featuring a reactive audio visualizer and widget system. A modern Rainmeter-like alternative built with WPF and clean hexagonal architecture.
 
 ## Features
-- Real-time audio capture using WASAPI loopback (NAudio)
-- FFT-based spectrum processing (MathNet.Numerics) with log-spaced band aggregation
-- Multi-monitor overlay windows
-- Click-through and always-on-top toggles (tray menu)
-- Global hotkeys: Ctrl+Alt+Shift+E (toggle overlay), Ctrl+Alt+Shift+S (open settings)
-- JSON settings persisted in `%AppData%/Equalizer/settings.json`
+- **Audio Visualizer**: Real-time spectrum visualization with bars or circular mode
+- **Widget System**: Clock, Date, System Info widgets with drag-and-drop positioning
+- **GPU Rendering**: Optional SkiaSharp-powered GPU acceleration
+- **Multi-monitor**: Overlay spans all monitors or specific ones
+- **Customizable**: Colors, gradients, glow effects, beat reactivity
+- **Settings persistence**: JSON in `%AppData%/Flux/`
+
+## Architecture
+- **Domain** (`Flux.Domain/`): Core models - `FluxSettings`, `ColorRgb`, widget configs
+- **Application** (`Flux.Application/`): Services like `IFluxService`, `SpectrumProcessor`
+- **Infrastructure** (`Flux.Infrastructure/`): Audio capture (NAudio), settings persistence
+- **Presentation** (`Flux.Presentation/`): WPF app, tray icon, overlays, settings UI
 
 ## Run
 ```powershell
-# Build
 dotnet build
-
-# Run (WPF)
-dotnet run --project .\Equalizer.Presentation\Equalizer.Presentation.csproj
+dotnet run --project .\Flux.Presentation\Flux.Presentation.csproj
 ```
-Tray icon appears; use context menu to show/hide overlay and open settings.
+Tray icon appears; right-click for options.
+
+## Controls
+- **Tray Menu**: Toggle overlay, settings, widgets, edit mode
+- **Global Hotkeys**: Ctrl+Alt+Shift+E (toggle), Ctrl+Alt+Shift+S (settings)
 
 ## Tests
 ```powershell
@@ -32,11 +33,7 @@ dotnet test
 ```
 
 ## Packages
-- NAudio (WASAPI loopback)
+- NAudio (WASAPI loopback audio)
 - MathNet.Numerics (FFT)
+- SkiaSharp (GPU rendering)
 - Microsoft.Extensions.* (Hosting, DI)
-
-## Roadmap
-- Settings: more visualization options (themes, bar shape, sensitivity profiles)
-- Packaging: MSIX/Squirrel, auto-start at login
-- Telemetry-free diagnostics and logging controls

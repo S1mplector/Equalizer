@@ -1,9 +1,0 @@
-<Application x:Class="Equalizer.Presentation.App"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Equalizer.Presentation"
-             ShutdownMode="OnExplicitShutdown">
-    <Application.Resources>
-         
-    </Application.Resources>
-</Application>

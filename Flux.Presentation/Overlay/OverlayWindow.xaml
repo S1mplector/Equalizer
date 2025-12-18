@@ -1,0 +1,59 @@
+<Window x:Class="Flux.Presentation.Overlay.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:overlay="clr-namespace:Flux.Presentation.Overlay"
+        xmlns:skia="clr-namespace:SkiaSharp.Views.WPF;assembly=SkiaSharp.Views.WPF"
+        mc:Ignorable="d"
+        Title="Flux Overlay" Background="Transparent"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
+        AllowsTransparency="True">
+    <Grid>
+        <overlay:VisualizerSurface x:Name="BarsCanvas" ClipToBounds="True" SnapsToDevicePixels="True"/>
+        <skia:SKElement x:Name="SkiaCanvas" Visibility="Collapsed" PaintSurface="SkiaCanvas_PaintSurface"/>
+        <TextBlock x:Name="PerfText" Foreground="White" FontSize="11" Margin="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Opacity="0.8" Visibility="Collapsed"/>
+        <Border x:Name="ConfirmPanel" Background="#DD000000" CornerRadius="6" Padding="10" Width="260" Height="80" Visibility="Collapsed"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,20,0,0">
+            <StackPanel>
+                <TextBlock Text="Save overlay position?" Foreground="White" FontWeight="Bold" Margin="0,0,0,8"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="CancelMoveButton" Content="Cancel" Width="80" Height="28" Margin="0,0,8,0"/>
+                    <Button x:Name="SaveMoveButton" Content="Save" Width="80" Height="28"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+        <Border x:Name="QuickSettingsPanel" Background="#DD000000" CornerRadius="6" Padding="10" Width="260" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,20,0">
+            <StackPanel>
+                <TextBlock Text="Quick settings" Foreground="White" FontWeight="Bold" Margin="0,0,0,8"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Bars" Width="80" VerticalAlignment="Center" Foreground="White"/>
+                    <Slider x:Name="QuickBarsSlider" Minimum="8" Maximum="256" TickFrequency="8" IsSnapToTickEnabled="True" Width="140"/>
+                </StackPanel>
+                <StackPanel Margin="0,4,0,4">
+                    <TextBlock Text="Color" Foreground="White" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <Border x:Name="QuickColorPreview" Height="20" CornerRadius="3" Background="#FF00FF80" Margin="0,0,0,4" MouseDown="QuickColorPreview_MouseDown"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <TextBlock Text="R" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorR" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <TextBlock Text="G" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorG" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="B" Width="16" Foreground="White" VerticalAlignment="Center"/>
+                        <Slider x:Name="QuickColorB" Minimum="0" Maximum="255" Width="160"/>
+                    </StackPanel>
+                    <Button x:Name="QuickEyedropperButton" Content="Eyedropper" Width="100" HorizontalAlignment="Right"/>
+                </StackPanel>
+                <CheckBox x:Name="QuickColorCycleEnabled" Content="Cycle color" Foreground="White" Margin="0,0,0,4"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                    <Button x:Name="QuickCancelButton" Content="Close" Width="80" Height="28" Margin="0,0,8,0"/>
+                    <Button x:Name="QuickApplyButton" Content="Apply" Width="80" Height="28"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
