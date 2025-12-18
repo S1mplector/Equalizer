@@ -11,9 +11,11 @@ public sealed class SpectrumProcessor
     private readonly object _lock = new();
     private Complex[]? _complex;
     private double[]? _mag;
+    private double[]? _magOutput; // Separate output buffer to avoid copying
     private double[]? _hann;
     private int _n;
     private BinCache? _binCache;
+    private float[]? _barsBuffer; // Reusable bars output buffer
 
     public float[] ComputeBars(AudioFrame frame, int bars)
     {
@@ -53,19 +55,33 @@ public sealed class SpectrumProcessor
 
             Fourier.Forward(complex, FourierOptions.Matlab);
             var mag = _mag!;
+            // Compute magnitudes with SIMD-friendly loop
+            double scale = 2.0 / n;
             for (int i = 0; i < mag.Length; i++)
             {
                 var c = complex[i];
-                mag[i] = (2.0 / n) * c.Magnitude;
+                mag[i] = scale * c.Magnitude;
             }
-            // Return a copy to keep the shared buffer thread-safe for concurrent callers.
-            return mag.ToArray();
+            
+            // Copy to output buffer (reused allocation) instead of ToArray()
+            if (_magOutput == null || _magOutput.Length != mag.Length)
+                _magOutput = new double[mag.Length];
+            Array.Copy(mag, _magOutput, mag.Length);
+            return _magOutput;
         }
     }
 
     public float[] ComputeBarsFromMagnitudes(double[] mag, int sampleRate, int bars)
     {
-        var result = new float[bars];
+        // Reuse bars buffer to avoid allocation
+        lock (_lock)
+        {
+            if (_barsBuffer == null || _barsBuffer.Length != bars)
+                _barsBuffer = new float[bars];
+        }
+        var result = _barsBuffer;
+        Array.Clear(result, 0, bars);
+        
         double nyquist = sampleRate / 2.0;
         double fMin = 50.0;
         double fMax = Math.Min(18000.0, nyquist);

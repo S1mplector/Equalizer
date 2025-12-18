@@ -31,7 +31,7 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
         _capture = new WasapiLoopbackCapture(device);
         SampleRate = _capture.WaveFormat.SampleRate;
         Channels = _capture.WaveFormat.Channels;
-        _maxQueueSamples = Math.Max(SampleRate / 16, 2048); // keep ~60ms of mono samples max to reduce latency
+        _maxQueueSamples = Math.Max(SampleRate / 32, 1024); // keep ~30ms of mono samples max for lower latency
         _buffer = new float[_maxQueueSamples * 2]; // small headroom to avoid drop chatter
         _capture.DataAvailable += OnDataAvailable;
         _capture.RecordingStopped += (_, __) => _dataAvailable.Release();
@@ -203,8 +203,8 @@ public sealed class WASAPILoopbackAudioInput : IAudioInputPort, IDisposable
 
     public async Task<AudioFrame> ReadFrameAsync(int minSamples, CancellationToken cancellationToken)
     {
-        if (minSamples <= 0) minSamples = 2048;
-        int hop = Math.Max(minSamples / 2, 1);
+        if (minSamples <= 0) minSamples = 512;
+        int hop = Math.Max(minSamples / 4, 64); // Smaller hop = fresher samples, lower latency
         if (_prevFrame != null && _prevFrame.Length != minSamples)
             _prevFrame = null;
 

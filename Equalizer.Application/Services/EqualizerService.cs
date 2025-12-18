@@ -14,8 +14,10 @@ public sealed class EqualizerService : IEqualizerService
     private readonly ISettingsPort _settings;
     private readonly SpectrumProcessor _processor;
     private float[]? _previous;
+    private float[]? _outputBuffer; // Reusable output buffer
     private double[]? _prevMag;
     private readonly double[] _fluxHistory = new double[64];
+    private readonly double[] _chroma = new double[12]; // Reusable chroma buffer
     private int _fluxIndex;
     private int _fluxCount;
     private readonly object _frameLock = new();
@@ -24,6 +26,8 @@ public sealed class EqualizerService : IEqualizerService
     private DateTime _lastFrameAt;
     private double _silenceFade = 1.0; // 1=fully visible, 0=fully faded
     private DateTime _lastBeatAt = DateTime.MinValue;
+    private EqualizerSettings? _settingsCache;
+    private DateTime _settingsCacheAt;
 
     public EqualizerService(IAudioInputPort audio, ISettingsPort settings, SpectrumProcessor processor)
     {
@@ -40,10 +44,18 @@ public sealed class EqualizerService : IEqualizerService
 
     public async Task<VisualizerFrame> GetVisualizerFrameAsync(CancellationToken cancellationToken)
     {
-        var settings = await _settings.GetAsync();
         var now = DateTime.UtcNow;
+        
+        // Cache settings to avoid async overhead on every frame (refresh every 500ms)
+        if (_settingsCache == null || (now - _settingsCacheAt).TotalMilliseconds > 500)
+        {
+            _settingsCache = await _settings.GetAsync();
+            _settingsCacheAt = now;
+        }
+        var settings = _settingsCache;
         var minIntervalMs = 1000.0 / Math.Clamp(settings.TargetFps, 10, 240);
-        if (_lastFrameCache != null && (now - _lastFrameAt).TotalMilliseconds < minIntervalMs)
+        // Only skip if we're significantly ahead of target - allow slight over-sampling for responsiveness
+        if (_lastFrameCache != null && (now - _lastFrameAt).TotalMilliseconds < minIntervalMs * 0.8)
         {
             return _lastFrameCache;
         }
@@ -76,16 +88,22 @@ public sealed class EqualizerService : IEqualizerService
             if (settings.Smoothing <= 0.3 && settings.TargetFps >= 120)
             {
                 // Low-latency profile: smaller window for faster reaction
+                minSamples = 256;
+            }
+            else if (settings.Smoothing <= 0.5 && settings.TargetFps >= 60)
+            {
+                // Balanced low-latency: good for beat detection
                 minSamples = 512;
             }
-            else if (settings.Smoothing >= 0.7 && settings.TargetFps <= 60)
+            else if (settings.Smoothing >= 0.7 && settings.TargetFps <= 30)
             {
                 // Smooth profile: larger window for more stable spectrum
                 minSamples = 2048;
             }
             else
             {
-                minSamples = 1024;
+                // Default: prioritize responsiveness
+                minSamples = 512;
             }
 
             var audioFrame = await _audio.ReadFrameAsync(minSamples, cancellationToken);
@@ -159,8 +177,10 @@ public sealed class EqualizerService : IEqualizerService
 
         if (_previous == null || _previous.Length != rawBars.Length)
             _previous = new float[rawBars.Length];
+        if (_outputBuffer == null || _outputBuffer.Length != rawBars.Length)
+            _outputBuffer = new float[rawBars.Length];
 
-        var output = new float[rawBars.Length];
+        var output = _outputBuffer;
         var smoothing = Math.Clamp(settings.Smoothing, 0.0, 1.0);
         if (isSilent && !settings.FadeOnSilenceEnabled)
         {
@@ -198,7 +218,8 @@ public sealed class EqualizerService : IEqualizerService
         float pitchStrength = 0f;
         if (!isSilent && mag.Length > 4)
         {
-            var chroma = new double[12];
+            Array.Clear(_chroma, 0, 12); // Reuse buffer
+            var chroma = _chroma;
             double chromaTotal = 0.0;
 
             for (int i = 1; i < mag.Length; i++)
@@ -305,8 +326,8 @@ public sealed class EqualizerService : IEqualizerService
             var nowBeat = DateTime.UtcNow;
             var sinceLastMs = (nowBeat - _lastBeatAt).TotalMilliseconds;
 
-            // Basic refractory period (~80ms) to avoid double-triggers on a single hit
-            if (_lastBeatAt == DateTime.MinValue || sinceLastMs >= 80.0)
+            // Basic refractory period (~50ms) to avoid double-triggers on a single hit
+            if (_lastBeatAt == DateTime.MinValue || sinceLastMs >= 50.0)
             {
                 isBeatFlag = true;
                 _lastBeatAt = nowBeat;

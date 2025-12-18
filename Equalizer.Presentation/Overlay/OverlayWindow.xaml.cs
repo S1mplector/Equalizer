@@ -79,7 +79,7 @@ public partial class OverlayWindow : Window
         _ = ApplyInitialOffsetAsync();
         _settingsRefreshTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(250) // Refresh more frequently to keep cache fresh
         };
         _settingsRefreshTimer.Tick += async (_, __) => await RefreshSettingsSnapshotAsync();
         _settingsRefreshTimer.Start();
@@ -530,8 +530,10 @@ public partial class OverlayWindow : Window
     {
         lock (_settingsCacheLock)
         {
+            // Extend staleness tolerance to 2s to avoid frame drops during transient delays
+            // Settings don't change that frequently, so this is safe
             var fresh = _settingsSnapshot != null &&
-                        (DateTime.UtcNow - _settingsSnapshotAt).TotalMilliseconds < 1000;
+                        (DateTime.UtcNow - _settingsSnapshotAt).TotalMilliseconds < 2000;
             settings = fresh ? _settingsSnapshot : null;
             return fresh;
         }
