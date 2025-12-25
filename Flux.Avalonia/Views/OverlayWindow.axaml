@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Flux.Avalonia.Views.OverlayWindow"
+        Title="Flux Overlay"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ShowInTaskbar="False"
+        CanResize="False"
+        WindowStartupLocation="Manual">
+    
+    <Canvas x:Name="OverlayCanvas" Background="Transparent">
+        <!-- Visualizer will be rendered here via SkiaSharp -->
+        <Viewbox x:Name="VisualizerHost" 
+                 Stretch="None"
+                 Canvas.Left="0" 
+                 Canvas.Top="0">
+        </Viewbox>
+    </Canvas>
+</Window>

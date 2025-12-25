@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Flux.Avalonia.Views.SettingsWindow"
+        Title="Flux Settings"
+        Width="500"
+        Height="600"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False">
+    
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <TextBlock Text="Flux Settings" FontSize="24" FontWeight="Bold"/>
+            
+            <!-- Audio Device -->
+            <Border Background="#1a1a1a" CornerRadius="8" Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Audio" FontWeight="SemiBold" FontSize="16"/>
+                    <ComboBox x:Name="AudioDeviceCombo" 
+                              PlaceholderText="Select audio device"
+                              HorizontalAlignment="Stretch"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Visualizer Settings -->
+            <Border Background="#1a1a1a" CornerRadius="8" Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Visualizer" FontWeight="SemiBold" FontSize="16"/>
+                    
+                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                        <TextBlock Text="Bar Count" VerticalAlignment="Center"/>
+                        <Slider x:Name="BarCountSlider" Grid.Column="1" 
+                                Minimum="16" Maximum="128" Value="64"
+                                Margin="10,0"/>
+                        <TextBlock x:Name="BarCountLabel" Grid.Column="2" Text="64" Width="30"/>
+                        
+                        <TextBlock Text="Sensitivity" Grid.Row="1" VerticalAlignment="Center"/>
+                        <Slider x:Name="SensitivitySlider" Grid.Row="1" Grid.Column="1"
+                                Minimum="0.1" Maximum="3.0" Value="1.0"
+                                Margin="10,0"/>
+                        <TextBlock x:Name="SensitivityLabel" Grid.Row="1" Grid.Column="2" Text="1.0" Width="30"/>
+                        
+                        <TextBlock Text="Smoothing" Grid.Row="2" VerticalAlignment="Center"/>
+                        <Slider x:Name="SmoothingSlider" Grid.Row="2" Grid.Column="1"
+                                Minimum="0" Maximum="0.95" Value="0.5"
+                                Margin="10,0"/>
+                        <TextBlock x:Name="SmoothingLabel" Grid.Row="2" Grid.Column="2" Text="0.5" Width="30"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Colors -->
+            <Border Background="#1a1a1a" CornerRadius="8" Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Colors" FontWeight="SemiBold" FontSize="16"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="Primary:" VerticalAlignment="Center"/>
+                        <Border x:Name="PrimaryColorPreview" 
+                                Width="40" Height="25" 
+                                CornerRadius="4" 
+                                Background="#00d4ff"/>
+                    </StackPanel>
+                    
+                    <CheckBox x:Name="UseGradientCheck" Content="Use gradient"/>
+                    <CheckBox x:Name="GlowEnabledCheck" Content="Enable glow effect"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Display Mode -->
+            <Border Background="#1a1a1a" CornerRadius="8" Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Display" FontWeight="SemiBold" FontSize="16"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <RadioButton x:Name="BarsMode" Content="Bars" IsChecked="True" GroupName="DisplayMode"/>
+                        <RadioButton x:Name="CircularMode" Content="Circular" GroupName="DisplayMode"/>
+                    </StackPanel>
+                    
+                    <CheckBox x:Name="MirrorCheck" Content="Mirror spectrum"/>
+                    <CheckBox x:Name="GpuRenderCheck" Content="GPU acceleration (SkiaSharp)"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Actions -->
+            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                <Button x:Name="ResetButton" Content="Reset to Defaults"/>
+                <Button x:Name="SaveButton" Content="Save" Classes="accent"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

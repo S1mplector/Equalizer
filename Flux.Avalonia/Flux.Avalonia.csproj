@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    
+    <!-- Version info -->
+    <BaseVersion>1.0.0</BaseVersion>
+    <Version>$(BaseVersion)</Version>
+    <FileVersion>$(Version)</FileVersion>
+    <AssemblyVersion>$(BaseVersion).0</AssemblyVersion>
+    <Product>Flux</Product>
+    <Company>Flux</Company>
+    
+    <!-- macOS specific -->
+    <RuntimeIdentifiers>win-x64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flux.Application\Flux.Application.csproj" />
+    <ProjectReference Include="..\Flux.Infrastructure\Flux.Infrastructure.csproj" />
+    <ProjectReference Include="..\Flux.Domain\Flux.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Avalonia -->
+    <PackageReference Include="Avalonia" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.1" />
+    
+    <!-- SkiaSharp for GPU rendering (version must match Avalonia.Skia requirement) -->
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+    <PackageReference Include="Avalonia.Skia" Version="11.2.1" />
+    
+    <!-- DI and Hosting -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    
+    <!-- Diagnostics (dev only) -->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.2.1" Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Resources\**" Condition="Exists('Resources')" />
+  </ItemGroup>
+
+  <!-- Conditional platform packages -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+  </ItemGroup>
+
+  <Target Name="PopulateGitInfo" BeforeTargets="GenerateAssemblyInfo" Condition="'$(GitCommitIdShort)' == ''">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitIdShort" />
+    </Exec>
+    <PropertyGroup>
+      <GitCommitIdShort>$(GitCommitIdShort.Trim())</GitCommitIdShort>
+      <CommitHash Condition="'$(GitCommitIdShort)' != ''">$(GitCommitIdShort)</CommitHash>
+      <CommitHash Condition="'$(CommitHash)' == ''">local</CommitHash>
+      <AssemblyInformationalVersion>$(Version)+$(CommitHash)</AssemblyInformationalVersion>
+    </PropertyGroup>
+  </Target>
+</Project>

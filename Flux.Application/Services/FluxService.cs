@@ -28,12 +28,65 @@ public sealed class FluxService : IFluxService
     private DateTime _lastBeatAt = DateTime.MinValue;
     private FluxSettings? _settingsCache;
     private DateTime _settingsCacheAt;
+    private CancellationTokenSource? _loopCts;
+    private Task? _loopTask;
+
+    public event Action<float[]>? SpectrumUpdated;
 
     public FluxService(IAudioInputPort audio, ISettingsPort settings, SpectrumProcessor processor)
     {
         _audio = audio;
         _settings = settings;
         _processor = processor;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (_loopTask != null) return;
+        
+        _loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _loopTask = RunLoopAsync(_loopCts.Token);
+        await Task.CompletedTask;
+    }
+
+    public async Task StopAsync()
+    {
+        if (_loopCts != null)
+        {
+            _loopCts.Cancel();
+            _loopCts.Dispose();
+            _loopCts = null;
+        }
+        
+        if (_loopTask != null)
+        {
+            try { await _loopTask; } catch (OperationCanceledException) { }
+            _loopTask = null;
+        }
+    }
+
+    private async Task RunLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                var frame = await GetVisualizerFrameAsync(cancellationToken);
+                SpectrumUpdated?.Invoke(frame.Bars);
+                
+                // Yield to allow UI updates
+                await Task.Delay(1, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue on other errors
+                await Task.Delay(16, cancellationToken);
+            }
+        }
     }
 
     public async Task<float[]> GetBarsAsync(CancellationToken cancellationToken)
